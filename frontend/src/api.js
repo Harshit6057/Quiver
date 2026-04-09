@@ -28,6 +28,11 @@ export const fetchCurrentUser = async () => {
     return res.json();
 };
 
+export const fetchProfile = async (username) => {
+    const res = await fetch(`${API_URL}/user/profile/${username}`);
+    return res.json();
+};
+
 // -- COMMUNITY --
 export const createCommunity = async (name, description) => {
     const headers = await getAuthHeaders();
@@ -54,10 +59,31 @@ export const fetchAllCommunities = async () => {
     return res.json();
 };
 
+export const fetchCommunityByName = async (name) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_URL}/community/name/${name}`, { headers });
+    return res.json();
+};
+
+export const fetchPostsByCommunityName = async (name) => {
+    const res = await fetch(`${API_URL}/posts/comm-name/${name}`);
+    return res.json();
+};
+
+export const fetchStats = async () => {
+    const res = await fetch(`${API_URL}/stats`);
+    return res.json();
+};
+
 // -- POSTS --
 export const fetchFeed = async () => {
     const headers = await getAuthHeaders(); // required for tailored feed
     const res = await fetch(`${API_URL}/posts/feed`, { headers });
+    return res.json();
+};
+
+export const fetchTrendingPosts = async () => {
+    const res = await fetch(`${API_URL}/posts/trending`);
     return res.json();
 };
 

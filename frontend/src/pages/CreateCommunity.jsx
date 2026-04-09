@@ -1,25 +1,49 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createCommunity, fetchStats } from '../api';
 
 const CreateCommunity = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [stats, setStats] = useState({ totalClusters: 0, totalNodes: 0, latency: '0.00s' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadStats = async () => {
+      const res = await fetchStats();
+      if (res.success) setStats(res.data);
+    };
+    loadStats();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !description) return;
     
-    // In a real app we'd POST to backend here
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    navigate(`/c/${slug}`);
+    setIsSubmitting(true);
+    try {
+      const res = await createCommunity(name, description);
+      if (res.success) {
+        // Navigate using the name as slug (assuming backend creates name)
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        navigate(`/c/${name}`);
+      } else {
+        alert(res.error || "Failed to initialize community cluster.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Encryption handshake failed. Retry initialization.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="pt-12 pb-12 pr-8 relative overflow-hidden min-h-[calc(100vh-5rem)]">
       {/* Background decorative elements */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 blur-[120px] rounded-full pointer-events-none"></div>
-      <div class="absolute bottom-[-5%] left-[20%] w-[400px] h-[400px] bg-secondary/5 blur-[100px] rounded-full pointer-events-none"></div>
+      <div className="absolute bottom-[-5%] left-[20%] w-[400px] h-[400px] bg-secondary/5 blur-[100px] rounded-full pointer-events-none"></div>
       
       <div className="max-w-4xl mx-auto relative z-10 p-4 md:p-8">
         {/* Header Section */}
@@ -58,10 +82,11 @@ const CreateCommunity = () => {
               </div>
               <div className="pt-4">
                 <button 
-                  className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-5 rounded-xl font-headline font-black text-lg tracking-tight hover:shadow-[0_0_30px_rgba(221,183,255,0.5)] transition-all active:scale-[0.98]" 
+                  disabled={isSubmitting}
+                  className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-5 rounded-xl font-headline font-black text-lg tracking-tight hover:shadow-[0_0_30px_rgba(221,183,255,0.5)] transition-all active:scale-[0.98] disabled:opacity-50" 
                   type="submit"
                 >
-                  Initialize Community
+                  {isSubmitting ? "Initializing Node..." : "Initialize Community"}
                 </button>
               </div>
             </form>
@@ -95,32 +120,22 @@ const CreateCommunity = () => {
                 </li>
               </ul>
             </div>
-            
-            <div className="p-8 rounded-xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20">
-              <div className="flex items-center justify-between mb-4">
-                <span className="px-3 py-1 bg-primary/20 text-primary text-[10px] font-bold rounded-full uppercase tracking-tighter">Pro Feature</span>
-                <span className="material-symbols-outlined text-primary text-xl">auto_awesome</span>
-              </div>
-              <h4 className="font-headline text-white font-bold mb-2">Neural Moderation</h4>
-              <p className="text-sm text-slate-400 leading-relaxed font-body">Enable our local LLM to assist in community management and sentiment analysis.</p>
-              <button className="mt-4 text-primary font-headline text-xs font-bold uppercase tracking-widest hover:underline">Learn More</button>
-            </div>
           </aside>
         </div>
 
         {/* Footer Stats or Context */}
         <footer className="mt-20 pt-8 border-t border-white/5 flex flex-wrap gap-12">
           <div className="flex flex-col">
-            <span className="text-secondary font-headline text-2xl font-bold">12.4k</span>
-            <span className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-headline">Active Clusters</span>
+            <span className="text-secondary font-headline text-3xl font-bold">{stats.totalClusters}</span>
+            <span className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-headline font-bold">Active Clusters</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-secondary font-headline text-2xl font-bold">2.1M</span>
-            <span className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-headline">Total Nodes</span>
+            <span className="text-secondary font-headline text-3xl font-bold">{stats.totalNodes}</span>
+            <span className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-headline font-bold">Total Nodes</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-secondary font-headline text-2xl font-bold">0.04s</span>
-            <span className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-headline">Sync Latency</span>
+            <span className="text-secondary font-headline text-3xl font-bold">{stats.latency}</span>
+            <span className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-headline font-bold">Sync Latency</span>
           </div>
         </footer>
       </div>

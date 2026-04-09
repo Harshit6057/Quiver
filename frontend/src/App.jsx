@@ -12,6 +12,7 @@ import UserProfile from './pages/UserProfile';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Bookmarks from './pages/Bookmarks';
+import Trending from './pages/Trending';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -99,6 +100,7 @@ function App() {
         <Route path="/u/:username" element={<UserProfile />} />
         <Route path="/post/:id" element={<PostDetail />} />
         <Route path="/bookmarks" element={<Bookmarks user={user} />} />
+        <Route path="/trending" element={<Trending />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
       </Routes>

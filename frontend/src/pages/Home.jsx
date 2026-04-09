@@ -25,7 +25,7 @@ const Home = ({ feed, user }) => {
         </div>
         <div className="flex items-center bg-surface-container-lowest p-1 rounded-xl">
           <button className="px-6 py-2 rounded-lg bg-surface-container-highest text-primary font-medium text-sm transition-all">For You</button>
-          <button className="px-6 py-2 rounded-lg text-slate-500 hover:text-slate-200 font-medium text-sm transition-all">Trending</button>
+          <Link to="/trending" className="px-6 py-2 rounded-lg text-slate-500 hover:text-slate-200 font-medium text-sm transition-all">Trending</Link>
         </div>
       </header>
 

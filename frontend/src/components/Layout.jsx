@@ -1,7 +1,8 @@
 import React from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 
 const Layout = ({ children, user, handleLogin }) => {
+  const navigate = useNavigate();
   const activeClass = "bg-purple-500/10 text-purple-300 border-r-4 border-purple-500 px-6 py-4 flex items-center gap-4 group transition-all duration-300";
   const inactiveClass = "text-slate-500 hover:text-slate-300 px-6 py-4 flex items-center gap-4 group transition-all duration-300 hover:bg-white/5 border-r-4 border-transparent";
 
@@ -94,17 +95,23 @@ const Layout = ({ children, user, handleLogin }) => {
       </div>
 
       {/* Floating Action Button (FAB) */}
-      <button className="fixed bottom-12 right-12 h-16 w-16 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary shadow-[0_0_40px_rgba(221,183,255,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 z-50">
-        <span className="material-symbols-outlined text-3xl">add</span>
+      <button 
+        onClick={() => navigate('/create-community')}
+        className="fixed bottom-12 right-12 h-16 w-16 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary shadow-[0_0_40px_rgba(221,183,255,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 z-50 group"
+      >
+        <span className="material-symbols-outlined text-3xl group-hover:rotate-90 transition-transform duration-300">add</span>
       </button>
 
       {/* BottomNavBar (Mobile Only) */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-slate-900/80 backdrop-blur-xl flex justify-around items-center h-16 z-50 shadow-[0_-10px_30px_-15px_rgba(168,85,247,0.3)]">
         <NavLink to="/" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>grid_view</NavLink>
         <NavLink to="/trending" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>trending_up</NavLink>
-        <div className="w-12 h-12 -mt-10 bg-gradient-to-r from-primary to-primary-container rounded-full flex items-center justify-center shadow-lg neon-glow-primary">
+        <button 
+          onClick={() => navigate('/create-community')}
+          className="w-12 h-12 -mt-10 bg-gradient-to-r from-primary to-primary-container rounded-full flex items-center justify-center shadow-lg neon-glow-primary active:scale-90 transition-all"
+        >
           <span className="material-symbols-outlined text-on-primary">add</span>
-        </div>
+        </button>
         <NavLink to="/explore" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>groups</NavLink>
         <NavLink to="/bookmarks" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>bookmark</NavLink>
       </nav>

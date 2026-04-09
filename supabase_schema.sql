@@ -84,9 +84,23 @@ CREATE POLICY "Votes are viewable by everyone" ON public.votes FOR SELECT USING 
 CREATE POLICY "Users can insert their own profile." ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "Users can update own profile." ON public.users FOR UPDATE USING (auth.uid() = id);
 
+-- Allow authenticated users to create and manage communities
+CREATE POLICY "Authenticated users can create communities" ON public.communities FOR INSERT WITH CHECK (auth.uid() = owner_id);
+CREATE POLICY "Owners can update their communities" ON public.communities FOR UPDATE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can delete their communities" ON public.communities FOR DELETE USING (auth.uid() = owner_id);
+
 -- For posts/comments
 CREATE POLICY "Authenticated users can create posts" ON public.posts FOR INSERT WITH CHECK (auth.uid() = author_id);
+CREATE POLICY "Authors can update their posts" ON public.posts FOR UPDATE USING (auth.uid() = author_id);
+CREATE POLICY "Authors can delete their posts" ON public.posts FOR DELETE USING (auth.uid() = author_id);
+
 CREATE POLICY "Authenticated users can create comments" ON public.comments FOR INSERT WITH CHECK (auth.uid() = author_id);
+CREATE POLICY "Authors can update their comments" ON public.comments FOR UPDATE USING (auth.uid() = author_id);
+CREATE POLICY "Authors can delete their comments" ON public.comments FOR DELETE USING (auth.uid() = author_id);
+
 CREATE POLICY "Authenticated users can join communities" ON public.community_members FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can leave communities" ON public.community_members FOR DELETE USING (auth.uid() = user_id);
+
 CREATE POLICY "Authenticated users can vote" ON public.votes FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Authenticated users can update their vote" ON public.votes FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Authenticated users can remove their vote" ON public.votes FOR DELETE USING (auth.uid() = user_id);
