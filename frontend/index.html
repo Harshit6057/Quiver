@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ethereal</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-container": "#00424e",
+                        "on-tertiary-fixed-variant": "#604100",
+                        "background": "#0b1326",
+                        "on-background": "#dae2fd",
+                        "on-surface-variant": "#cfc2d6",
+                        "on-secondary-fixed": "#001f26",
+                        "outline": "#988d9f",
+                        "on-error": "#690005",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#281900",
+                        "error-container": "#93000a",
+                        "primary-fixed": "#f0dbff",
+                        "on-tertiary": "#432c00",
+                        "secondary-fixed": "#acedff",
+                        "on-primary-fixed": "#2c0051",
+                        "surface-container": "#171f33",
+                        "surface-container-highest": "#2d3449",
+                        "on-tertiary-container": "#3a2600",
+                        "outline-variant": "#4d4354",
+                        "error": "#ffb4ab",
+                        "on-primary": "#490080",
+                        "inverse-on-surface": "#283044",
+                        "tertiary": "#fabc4e",
+                        "secondary-container": "#03b5d3",
+                        "surface-container-low": "#131b2e",
+                        "secondary": "#4cd7f6",
+                        "surface-container-high": "#222a3d",
+                        "surface": "#0b1326",
+                        "on-surface": "#dae2fd",
+                        "primary-container": "#b76dff",
+                        "on-primary-fixed-variant": "#6900b3",
+                        "tertiary-fixed-dim": "#fabc4e",
+                        "primary": "#ddb7ff",
+                        "surface-tint": "#ddb7ff",
+                        "tertiary-fixed": "#ffdead",
+                        "inverse-primary": "#842bd2",
+                        "secondary-fixed-dim": "#4cd7f6",
+                        "surface-variant": "#2d3449",
+                        "on-secondary": "#003640",
+                        "surface-dim": "#0b1326",
+                        "surface-bright": "#31394d",
+                        "surface-container-lowest": "#060e20",
+                        "inverse-surface": "#dae2fd",
+                        "tertiary-container": "#bd871a",
+                        "on-secondary-fixed-variant": "#004e5c",
+                        "on-primary-container": "#400071",
+                        "primary-fixed-dim": "#ddb7ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        .glass-card {
+            background: rgba(45, 52, 73, 0.5);
+            backdrop-filter: blur(20px);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0b1326;
+            color: #dae2fd;
+            font-family: 'Inter', sans-serif;
+        }
+        .headline-font, .font-space-grotesk {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .glass-panel { backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .neon-glow-primary { box-shadow: 0 0 20px -5px rgba(221, 183, 255, 0.3); }
+        .neon-glow-secondary { box-shadow: 0 0 20px -5px rgba(76, 215, 246, 0.3); }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
