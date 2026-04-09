@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { fetchCurrentUser, fetchFeed } from './api';
 import { supabase } from './supabaseClient';
 import Layout from './components/Layout';
@@ -11,65 +11,98 @@ import CreateCommunity from './pages/CreateCommunity';
 import UserProfile from './pages/UserProfile';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
+import Bookmarks from './pages/Bookmarks';
 
 function App() {
   const [user, setUser] = useState(null);
   const [feed, setFeed] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
+    let mounted = true;
+
+    // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) loadData(false);
+      if (mounted) {
+        if (session) {
+          loadData(false);
+        } else {
+          setLoading(false);
+        }
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+
       if (session) {
+        // Only consider SIGNED_IN as a redirect trigger if we are on login/landing
+        // and it's not the initial mount session check.
+        // Actually, let's just use loadData and manage navigation there.
         loadData(event === 'SIGNED_IN');
       } else {
         setUser(null);
         setFeed([]);
+        setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const loadData = async (isNewSignIn = false) => {
+  const loadData = async (shouldRedirect = false) => {
     try {
       const u = await fetchCurrentUser();
       if (u && u.success) {
         setUser(u.data);
-        if (isNewSignIn) {
-          window.location.href = `/u/${u.data.username}`;
-          return;
+        
+        // Only redirect if explicitly requested (e.g. from SIGNED_IN event)
+        // AND we are on a login or landing page.
+        if (shouldRedirect && (location.pathname === '/login' || location.pathname === '/landing' || location.pathname === '/')) {
+          navigate(`/u/${u.data.username}`);
         }
       }
-
+      
       const f = await fetchFeed();
       if (f && f.success) setFeed(f.data);
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleLogin = () => {
-    window.location.href = '/login';
+    navigate('/login');
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
+
   return (
-    <BrowserRouter>
-      <Layout user={user} handleLogin={handleLogin}>
-        <Routes>
-          <Route path="/" element={<Home feed={feed} />} />
-          <Route path="/explore" element={<ExploreCommunities />} />
-          <Route path="/c/:community" element={<CommunityView />} />
-          <Route path="/create-community" element={<CreateCommunity />} />
-          <Route path="/u/:username" element={<UserProfile />} />
-          <Route path="/post/:id" element={<PostDetail />} />
-          <Route path="/landing" element={<LandingPage />} />
-          <Route path="/login" element={<Login />} />
-        </Routes>
-      </Layout>
-    </BrowserRouter>
+    <Layout user={user} handleLogin={handleLogin}>
+      <Routes>
+        <Route path="/" element={<Home feed={feed} user={user} />} />
+        <Route path="/explore" element={<ExploreCommunities user={user} />} />
+        <Route path="/c/:community" element={<CommunityView />} />
+        <Route path="/create-community" element={<CreateCommunity />} />
+        <Route path="/u/:username" element={<UserProfile />} />
+        <Route path="/post/:id" element={<PostDetail />} />
+        <Route path="/bookmarks" element={<Bookmarks user={user} />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+      </Routes>
+    </Layout>
   );
 }
 

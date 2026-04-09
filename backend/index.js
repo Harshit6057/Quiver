@@ -51,7 +51,10 @@ app.get('/api/user', authenticate, async (req, res) => {
     return res.json({ success: true, data: newUser });
   }
 
-  res.json({ success: true, data: dbUser });
+  const { data: joined } = await userClient.from('community_members').select('community_id').eq('user_id', req.user.id);
+  const communityIds = joined?.map(j => j.community_id) || [];
+
+  res.json({ success: true, data: { ...dbUser, joined_communities: communityIds } });
 });
 
 /* --- COMMUNITY --- */
@@ -94,9 +97,23 @@ app.post('/api/community/leave', authenticate, async (req, res) => {
 });
 
 app.get('/api/community/all', async (req, res) => {
-  const { data, error } = await supabase.from('communities').select('*');
-  if (error) return res.status(500).json({ success: false, error: error.message });
-  res.json({ success: true, data });
+  const { data, error } = await supabase
+    .from('communities')
+    .select('*, community_members!inner(count)')
+    // Wait, community_members!inner would only return if there are members. 
+    // Usually we want all communities.
+    .select('*, members:community_members(count)');
+
+  // Let's use a simpler approach since select(count) can be tricky in some versions
+  const { data: communities, error: cError } = await supabase.from('communities').select('*');
+  if (cError) return res.status(500).json({ success: false, error: cError.message });
+
+  const enriched = await Promise.all(communities.map(async (c) => {
+     const { count } = await supabase.from('community_members').select('*', { count: 'exact', head: true }).eq('community_id', c.id);
+     return { ...c, member_count: count || 0 };
+  }));
+
+  res.json({ success: true, data: enriched });
 });
 
 app.get('/api/community/:id', async (req, res) => {

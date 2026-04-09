@@ -1,7 +1,10 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 
 const Layout = ({ children, user, handleLogin }) => {
+  const activeClass = "bg-purple-500/10 text-purple-300 border-r-4 border-purple-500 px-6 py-4 flex items-center gap-4 group transition-all duration-300";
+  const inactiveClass = "text-slate-500 hover:text-slate-300 px-6 py-4 flex items-center gap-4 group transition-all duration-300 hover:bg-white/5 border-r-4 border-transparent";
+
   return (
     <div className="bg-background text-on-background min-h-screen font-body selection:bg-primary-fixed/30">
       {/* TopNavBar */}
@@ -9,7 +12,7 @@ const Layout = ({ children, user, handleLogin }) => {
         <div className="flex items-center gap-8">
           <Link to="/" className="text-2xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-purple-600 font-headline">Ethereal</Link>
           <div className="hidden md:flex items-center gap-6 font-headline tracking-tighter text-sm uppercase">
-          <Link to="/explore" className="text-purple-300 border-b-2 border-purple-500 pb-1">Explore</Link>
+            <NavLink to="/explore" className={({ isActive }) => isActive ? "text-purple-300 border-b-2 border-purple-500 pb-1" : "text-slate-400 hover:text-slate-200 transition-all duration-300"}>Explore</NavLink>
             <Link to="/" className="text-slate-400 hover:text-slate-200 transition-all duration-300">Activity</Link>
             <Link to="/" className="text-slate-400 hover:text-slate-200 transition-all duration-300">Vault</Link>
           </div>
@@ -27,7 +30,7 @@ const Layout = ({ children, user, handleLogin }) => {
                     Sign In
                 </button>
             ) : (
-                <Link to={`/u/${user?.username || 'me'}`} className="w-10 h-10 rounded-full border border-primary/20 overflow-hidden ml-4">
+                <Link to={`/u/${user?.username}`} className="w-10 h-10 rounded-full border border-primary/20 overflow-hidden ml-4">
                   <img src={user?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=placeholder"} alt="User Avatar" className="w-full h-full object-cover" />
                 </Link>
             )}
@@ -47,26 +50,26 @@ const Layout = ({ children, user, handleLogin }) => {
           <span className="font-headline uppercase tracking-widest text-[10px] text-slate-500">V 2.0.4</span>
         </div>
         <nav className="flex flex-col gap-1 flex-1">
-          <Link to="/" className="bg-purple-500/10 text-purple-300 border-r-4 border-purple-500 px-6 py-4 flex items-center gap-4 group transition-colors duration-300">
+          <NavLink to="/" end className={({ isActive }) => isActive ? activeClass : inactiveClass}>
             <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>grid_view</span>
             <span className="font-headline uppercase tracking-widest text-[10px]">Home</span>
-          </Link>
-          <Link to="/" className="text-slate-500 hover:text-slate-300 px-6 py-4 flex items-center gap-4 group transition-colors duration-300 hover:bg-white/5">
+          </NavLink>
+          <NavLink to="/trending" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
             <span className="material-symbols-outlined text-lg">trending_up</span>
             <span className="font-headline uppercase tracking-widest text-[10px]">Trending</span>
-          </Link>
-          <Link to="/explore" className="text-slate-500 hover:text-slate-300 px-6 py-4 flex items-center gap-4 group transition-colors duration-300 hover:bg-white/5">
+          </NavLink>
+          <NavLink to="/explore" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
             <span className="material-symbols-outlined text-lg">groups</span>
             <span className="font-headline uppercase tracking-widest text-[10px]">Communities</span>
-          </Link>
-          <Link to="/" className="text-slate-500 hover:text-slate-300 px-6 py-4 flex items-center gap-4 group transition-colors duration-300 hover:bg-white/5">
+          </NavLink>
+          <NavLink to="/bookmarks" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
             <span className="material-symbols-outlined text-lg">bookmark</span>
             <span className="font-headline uppercase tracking-widest text-[10px]">Bookmarks</span>
-          </Link>
-          <Link to="/" className="text-slate-500 hover:text-slate-300 px-6 py-4 flex items-center gap-4 group transition-colors duration-300 hover:bg-white/5">
+          </NavLink>
+          <NavLink to="/history" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
             <span className="material-symbols-outlined text-lg">history</span>
             <span className="font-headline uppercase tracking-widest text-[10px]">History</span>
-          </Link>
+          </NavLink>
         </nav>
         <div className="mt-auto p-6 space-y-4">
           <button className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary text-xs font-bold uppercase tracking-widest hover:shadow-[0_0_20px_rgba(221,183,255,0.4)] transition-all">
@@ -97,13 +100,13 @@ const Layout = ({ children, user, handleLogin }) => {
 
       {/* BottomNavBar (Mobile Only) */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-slate-900/80 backdrop-blur-xl flex justify-around items-center h-16 z-50 shadow-[0_-10px_30px_-15px_rgba(168,85,247,0.3)]">
-        <Link to="/" className="material-symbols-outlined text-purple-300">grid_view</Link>
-        <Link to="/" className="material-symbols-outlined text-slate-400">trending_up</Link>
+        <NavLink to="/" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>grid_view</NavLink>
+        <NavLink to="/trending" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>trending_up</NavLink>
         <div className="w-12 h-12 -mt-10 bg-gradient-to-r from-primary to-primary-container rounded-full flex items-center justify-center shadow-lg neon-glow-primary">
           <span className="material-symbols-outlined text-on-primary">add</span>
         </div>
-        <Link to="/" className="material-symbols-outlined text-slate-400">groups</Link>
-        <Link to="/" className="material-symbols-outlined text-slate-400">bookmark</Link>
+        <NavLink to="/explore" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>groups</NavLink>
+        <NavLink to="/bookmarks" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>bookmark</NavLink>
       </nav>
     </div>
   );
