@@ -8,6 +8,7 @@ import PostDetail from './pages/PostDetail';
 import ExploreCommunities from './pages/ExploreCommunities';
 import CommunityView from './pages/CommunityView';
 import CreateCommunity from './pages/CreateCommunity';
+import CreatePost from './pages/CreatePost';
 import UserProfile from './pages/UserProfile';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
@@ -95,8 +96,10 @@ function App() {
       <Routes>
         <Route path="/" element={<Home feed={feed} user={user} />} />
         <Route path="/explore" element={<ExploreCommunities user={user} />} />
-        <Route path="/c/:community" element={<CommunityView />} />
+        <Route path="/c/:community" element={<CommunityView user={user} />} />
         <Route path="/create-community" element={<CreateCommunity />} />
+        <Route path="/create-post" element={<CreatePost user={user} />} />
+        <Route path="/create-post/:community" element={<CreatePost user={user} />} />
         <Route path="/u/:username" element={<UserProfile />} />
         <Route path="/post/:id" element={<PostDetail />} />
         <Route path="/bookmarks" element={<Bookmarks user={user} />} />

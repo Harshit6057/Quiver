@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import { fetchPostById } from '../api';
 
 const PostDetail = () => {
   const { id } = useParams();
@@ -15,8 +16,15 @@ const PostDetail = () => {
   };
 
   useEffect(() => {
-    // In a real app we'd fetch via API using `id`. Using fallback for demo:
-    setPost(fallbackPost);
+    const loadPost = async () => {
+      const res = await fetchPostById(id);
+      if (res && res.success) {
+        setPost(res.data);
+      } else {
+        setPost(fallbackPost);
+      }
+    };
+    loadPost();
   }, [id]);
 
   if (!post) return <div className="p-12 text-center text-white">Synthesizing...</div>;
@@ -32,7 +40,7 @@ const PostDetail = () => {
             <div className="absolute bottom-8 left-8 right-8">
               <div className="flex items-center gap-3 mb-4">
                 <span className="px-3 py-1 bg-secondary/20 text-secondary border border-secondary/30 rounded-full text-[10px] font-space-grotesk uppercase tracking-widest">{post.community?.name || 'Void'}</span>
-                <span className="text-slate-400 text-[10px] font-space-grotesk uppercase tracking-widest">• {post.created_at}</span>
+                <span className="text-slate-400 text-[10px] font-space-grotesk uppercase tracking-widest">• {post.created_at && String(post.created_at).includes('T') ? new Date(post.created_at).toLocaleDateString() : post.created_at}</span>
               </div>
               <h1 className="text-4xl md:text-6xl font-black text-white font-space-grotesk tracking-tight leading-none mb-4">{post.title}</h1>
             </div>
@@ -52,7 +60,7 @@ const PostDetail = () => {
               <div className="flex items-center gap-2">
                 <button className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest hover:bg-primary/20 transition-all rounded-full border border-white/5">
                   <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
-                  <span className="text-sm font-bold text-on-surface">{post.votes_count >= 1000 ? (post.votes_count/1000).toFixed(1)+'k' : post.votes_count}</span>
+                  <span className="text-sm font-bold text-on-surface">{(post.votes_count || 0) >= 1000 ? ((post.votes_count || 0)/1000).toFixed(1)+'k' : (post.votes_count || 0)}</span>
                 </button>
                 <button className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest hover:bg-secondary/20 transition-all rounded-full border border-white/5">
                   <span className="material-symbols-outlined text-secondary">share</span>

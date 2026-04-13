@@ -95,12 +95,9 @@ const Layout = ({ children, user, handleLogin }) => {
       </div>
 
       {/* Floating Action Button (FAB) */}
-      <button 
-        onClick={() => navigate('/create-community')}
-        className="fixed bottom-12 right-12 h-16 w-16 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary shadow-[0_0_40px_rgba(221,183,255,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 z-50 group"
-      >
+      <Link to="/create-post" className="fixed bottom-12 right-12 h-16 w-16 rounded-full bg-gradient-to-tr from-primary to-primary-container text-on-primary shadow-[0_0_40px_rgba(221,183,255,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 z-50 group">
         <span className="material-symbols-outlined text-3xl group-hover:rotate-90 transition-transform duration-300">add</span>
-      </button>
+      </Link>
 
       {/* BottomNavBar (Mobile Only) */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-slate-900/80 backdrop-blur-xl flex justify-around items-center h-16 z-50 shadow-[0_-10px_30px_-15px_rgba(168,85,247,0.3)]">

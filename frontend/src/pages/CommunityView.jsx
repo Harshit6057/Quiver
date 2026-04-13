@@ -94,7 +94,7 @@ const CommunityView = ({ user }) => {
               <span className="material-symbols-outlined text-slate-300">share</span>
               <span className="font-bold uppercase tracking-widest text-[10px]">Share</span>
             </button>
-            {community.is_member || user?.joined_communities?.includes(community.id) ? (
+            {community.owner_id === user?.id ? null : community.is_member || user?.joined_communities?.includes(community.id) ? (
               <button disabled className="bg-white/10 text-white border border-white/20 px-10 py-4 rounded-xl font-headline font-bold text-lg opacity-80 flex items-center gap-2">
                 <span className="material-symbols-outlined text-green-400">check_circle</span>
                 Joined
@@ -130,7 +130,7 @@ const CommunityView = ({ user }) => {
               <div className="bg-white/5 rounded-3xl p-16 border border-dashed border-white/10 text-center">
                 <h3 className="text-2xl font-bold text-slate-500 mb-2">Sector is empty</h3>
                 <p className="text-slate-600 mb-8">No transmissions have been recorded in this nexus cluster yet.</p>
-                <Link to="/" className="bg-primary text-white px-8 py-3 rounded-xl font-bold">Create Post</Link>
+                <Link to={`/create-post/${community.name}`} className="bg-primary text-white px-8 py-3 rounded-xl font-bold inline-block">Create Post</Link>
               </div>
             ) : (
               posts.map(post => (

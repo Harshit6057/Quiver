@@ -222,6 +222,17 @@ app.post('/api/post/create', authenticate, async (req, res) => {
   res.json({ success: true, data });
 });
 
+app.get('/api/post/:id', async (req, res) => {
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*, author:users(username, avatar_url), community:communities(name)')
+    .eq('id', req.params.id)
+    .single();
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  res.json({ success: true, data });
+});
+
 app.get('/api/posts/feed', authenticate, async (req, res) => {
   const userClient = getAuthClient(req.headers.authorization);
   // Get communities the user joined

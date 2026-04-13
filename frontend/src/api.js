@@ -97,6 +97,11 @@ export const createPost = async (community_id, title, content) => {
     return res.json();
 };
 
+export const fetchPostById = async (id) => {
+    const res = await fetch(`${API_URL}/post/${id}`);
+    return res.json();
+};
+
 // -- COMMENTS --
 export const addComment = async (post_id, content, parent_comment_id = null) => {
     const headers = await getAuthHeaders();
