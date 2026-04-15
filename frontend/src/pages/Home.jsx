@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchAllCommunities } from '../api';
+import { fetchAllCommunities, vote } from '../api';
 
-const Home = ({ feed, user }) => {
+const Home = ({ feed, user, bookmarkedPostIds = [], onToggleBookmark, voteCounts = {}, onVoteCountChange }) => {
   const [sidebarCommunities, setSidebarCommunities] = useState([]);
 
   useEffect(() => {
@@ -14,6 +14,43 @@ const Home = ({ feed, user }) => {
     };
     loadSidebar();
   }, []);
+
+  const getDisplayVotes = (post) => {
+    if (Object.prototype.hasOwnProperty.call(voteCounts, post.id)) {
+      return voteCounts[post.id];
+    }
+    return post.votes_count ?? 0;
+  };
+
+  const handleVote = async (postId, voteType) => {
+    if (!user) {
+      alert('Please sign in to vote');
+      return;
+    }
+
+    const base = voteCounts[postId] ?? (feed.find(p => p.id === postId)?.votes_count ?? 0);
+    const nextValue = Math.max(0, base + voteType);
+    onVoteCountChange?.(postId, nextValue);
+
+    const res = await vote(voteType, postId);
+    if (!res?.success) {
+      onVoteCountChange?.(postId, base);
+      alert(res?.error || 'Unable to register vote right now');
+      return;
+    }
+
+    if (typeof res.totalVotes === 'number') {
+      onVoteCountChange?.(postId, res.totalVotes);
+    }
+  };
+
+  const handleBookmark = async (postId) => {
+    if (!onToggleBookmark) return;
+    const res = await onToggleBookmark(postId);
+    if (!res?.success) {
+      alert(res?.error || 'Unable to update bookmark right now');
+    }
+  };
 
   return (
     <div className="max-w-5xl mx-auto md:px-8">
@@ -76,11 +113,11 @@ const Home = ({ feed, user }) => {
                 <div className="flex items-center justify-between pt-4 relative z-10">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center bg-surface-container-lowest rounded-full p-1 border border-white/5">
-                      <button className="h-8 w-8 flex items-center justify-center text-secondary hover:bg-secondary/10 rounded-full transition-all">
+                      <button onClick={() => handleVote(post.id, 1)} className="h-8 w-8 flex items-center justify-center text-secondary hover:bg-secondary/10 rounded-full transition-all">
                         <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>stat_1</span>
                       </button>
-                      <span className="px-3 text-sm font-bold headline-font text-white">{post.votes_count || 0}</span>
-                      <button className="h-8 w-8 flex items-center justify-center text-error hover:bg-error/10 rounded-full transition-all rotate-180">
+                      <span className="px-3 text-sm font-bold headline-font text-white">{getDisplayVotes(post)}</span>
+                      <button onClick={() => handleVote(post.id, -1)} className="h-8 w-8 flex items-center justify-center text-error hover:bg-error/10 rounded-full transition-all rotate-180">
                         <span className="material-symbols-outlined text-lg">stat_1</span>
                       </button>
                     </div>
@@ -89,7 +126,9 @@ const Home = ({ feed, user }) => {
                       <span className="text-sm font-medium">Comments</span>
                     </Link>
                   </div>
-                  <button className="material-symbols-outlined text-slate-500 hover:text-white">bookmark</button>
+                  <button onClick={() => handleBookmark(post.id)} className={`material-symbols-outlined transition-colors ${bookmarkedPostIds.includes(post.id) ? 'text-secondary' : 'text-slate-500 hover:text-white'}`}>
+                    {bookmarkedPostIds.includes(post.id) ? 'bookmark' : 'bookmark_add'}
+                  </button>
                 </div>
               </div>
             ))

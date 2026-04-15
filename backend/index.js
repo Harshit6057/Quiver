@@ -9,6 +9,25 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const withPostVoteCounts = async (posts) => {
+  if (!posts || posts.length === 0) return [];
+
+  const enriched = await Promise.all(
+    posts.map(async (post) => {
+      const { data: postVotes } = await supabase
+        .from('votes')
+        .select('vote_type')
+        .eq('post_id', post.id)
+        .is('comment_id', null);
+
+      const votes_count = (postVotes || []).reduce((sum, row) => sum + (row.vote_type || 0), 0);
+      return { ...post, votes_count };
+    })
+  );
+
+  return enriched;
+};
+
 // Auth Middleware to get user context
 const authenticate = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -16,7 +35,7 @@ const authenticate = async (req, res, next) => {
 
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return res.status(401).json({ success: false, error: 'Unauthorized' });
-  
+
   req.user = user;
   next();
 };
@@ -40,7 +59,7 @@ app.get('/api/user', authenticate, async (req, res) => {
     // Create random username and avatar
     const randomUsername = `CosmicTiger${Math.floor(Math.random() * 10000)}`;
     const avatarUrl = `https://api.dicebear.com/7.x/identicon/svg?seed=${randomUsername}`;
-    
+
     const { data: newUser, error: createError } = await userClient
       .from('users')
       .insert([{ id: req.user.id, username: randomUsername, avatar_url: avatarUrl, email: req.user.email }])
@@ -75,7 +94,7 @@ app.get('/api/user/profile/:username', async (req, res) => {
 
   // Get total posts
   const { count: postCount } = await supabase.from('posts').select('*', { count: 'exact', head: true }).eq('author_id', user.id);
-  
+
   // Get joined clusters
   const { count: clusterCount } = await supabase.from('community_members').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
 
@@ -87,14 +106,14 @@ app.get('/api/user/profile/:username', async (req, res) => {
     .order('created_at', { ascending: false })
     .limit(5);
 
-  res.json({ 
-    success: true, 
-    data: { 
-      ...user, 
-      postCount: postCount || 0, 
+  res.json({
+    success: true,
+    data: {
+      ...user,
+      postCount: postCount || 0,
       clusterCount: clusterCount || 0,
       recentPosts: recentPosts || []
-    } 
+    }
   });
 });
 
@@ -102,14 +121,14 @@ app.get('/api/user/profile/:username', async (req, res) => {
 app.post('/api/community/create', authenticate, async (req, res) => {
   const { name, description } = req.body;
   const userClient = getAuthClient(req.headers.authorization);
-  
+
   // 1. Create the community
   const { data: community, error: cError } = await userClient
     .from('communities')
     .insert([{ name, description, owner_id: req.user.id }])
     .select()
     .single();
-  
+
   if (cError) return res.status(500).json({ success: false, error: cError.message });
 
   // 2. Automatically add owner as a member
@@ -160,8 +179,8 @@ app.get('/api/community/all', async (req, res) => {
   if (cError) return res.status(500).json({ success: false, error: cError.message });
 
   const enriched = await Promise.all(communities.map(async (c) => {
-     const { count } = await supabase.from('community_members').select('*', { count: 'exact', head: true }).eq('community_id', c.id);
-     return { ...c, member_count: count || 0 };
+    const { count } = await supabase.from('community_members').select('*', { count: 'exact', head: true }).eq('community_id', c.id);
+    return { ...c, member_count: count || 0 };
   }));
 
   res.json({ success: true, data: enriched });
@@ -181,17 +200,17 @@ app.get('/api/community/name/:name', async (req, res) => {
 
   // Get member count
   const { count } = await supabase.from('community_members').select('*', { count: 'exact', head: true }).eq('community_id', community.id);
-  
+
   // Check if current user is member (optional auth)
   let is_member = false;
   const authHeader = req.headers.authorization;
   if (authHeader) {
-      const token = authHeader.split(' ')[1];
-      const { data: { user } } = await supabase.auth.getUser(token);
-      if (user) {
-          const { data: member } = await supabase.from('community_members').select('*').eq('community_id', community.id).eq('user_id', user.id).single();
-          if (member) is_member = true;
-      }
+    const token = authHeader.split(' ')[1];
+    const { data: { user } } = await supabase.auth.getUser(token);
+    if (user) {
+      const { data: member } = await supabase.from('community_members').select('*').eq('community_id', community.id).eq('user_id', user.id).single();
+      if (member) is_member = true;
+    }
   }
 
   res.json({ success: true, data: { ...community, member_count: count || 0, is_member } });
@@ -209,7 +228,7 @@ app.post('/api/post/create', authenticate, async (req, res) => {
     .eq('community_id', community_id)
     .eq('user_id', req.user.id)
     .single();
-    
+
   if (!membership) return res.status(403).json({ success: false, error: 'Must join community to post' });
 
   const { data, error } = await userClient
@@ -230,7 +249,8 @@ app.get('/api/post/:id', async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ success: false, error: error.message });
-  res.json({ success: true, data });
+  const [postWithVotes] = await withPostVoteCounts([data]);
+  res.json({ success: true, data: postWithVotes });
 });
 
 app.get('/api/posts/feed', authenticate, async (req, res) => {
@@ -246,7 +266,8 @@ app.get('/api/posts/feed', authenticate, async (req, res) => {
     .order('created_at', { ascending: false });
 
   if (error) return res.status(500).json({ success: false, error: error.message });
-  res.json({ success: true, data });
+  const postsWithVotes = await withPostVoteCounts(data || []);
+  res.json({ success: true, data: postsWithVotes });
 });
 
 app.get('/api/posts/trending', async (req, res) => {
@@ -257,11 +278,13 @@ app.get('/api/posts/trending', async (req, res) => {
     .from('posts')
     .select('*, author:users(username, avatar_url), community:communities(name)')
     .gte('created_at', sevenDaysAgo.toISOString())
-    .order('votes_count', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(20);
 
   if (error) return res.status(500).json({ success: false, error: error.message });
-  res.json({ success: true, data });
+  const postsWithVotes = await withPostVoteCounts(data || []);
+  postsWithVotes.sort((a, b) => (b.votes_count || 0) - (a.votes_count || 0));
+  res.json({ success: true, data: postsWithVotes });
 });
 
 app.get('/api/posts/community/:id', async (req, res) => {
@@ -272,7 +295,8 @@ app.get('/api/posts/community/:id', async (req, res) => {
     .order('created_at', { ascending: false });
 
   if (error) return res.status(500).json({ success: false, error: error.message });
-  res.json({ success: true, data });
+  const postsWithVotes = await withPostVoteCounts(data || []);
+  res.json({ success: true, data: postsWithVotes });
 });
 
 app.get('/api/posts/comm-name/:name', async (req, res) => {
@@ -286,8 +310,70 @@ app.get('/api/posts/comm-name/:name', async (req, res) => {
     .order('created_at', { ascending: false });
 
   if (error) return res.status(500).json({ success: false, error: error.message });
-  res.json({ success: true, data });
+  const postsWithVotes = await withPostVoteCounts(data || []);
+  res.json({ success: true, data: postsWithVotes });
 });
+
+
+/* --- BOOKMARKS --- */
+app.get('/api/bookmarks', authenticate, async (req, res) => {
+  const userClient = getAuthClient(req.headers.authorization);
+  const { data, error } = await userClient
+    .from('bookmarks')
+    .select('id, post_id, created_at')
+    .eq('user_id', req.user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  const postIds = (data || []).map((item) => item.post_id);
+  if (postIds.length === 0) {
+    return res.json({ success: true, data: [] });
+  }
+
+  const { data: posts, error: postsError } = await supabase
+    .from('posts')
+    .select('*, author:users(username, avatar_url), community:communities(name)')
+    .in('id', postIds);
+
+  if (postsError) return res.status(500).json({ success: false, error: postsError.message });
+
+  const postsWithVotes = await withPostVoteCounts(posts || []);
+  const postMap = new Map(postsWithVotes.map((post) => [post.id, post]));
+  const hydrated = (data || []).map((item) => ({ ...item, post: postMap.get(item.post_id) || null }));
+  res.json({ success: true, data: hydrated });
+});
+
+app.post('/api/bookmark', authenticate, async (req, res) => {
+  const { post_id } = req.body;
+  const userClient = getAuthClient(req.headers.authorization);
+
+  if (!post_id) return res.status(400).json({ success: false, error: 'post_id is required' });
+
+  // Check if it already exists
+  const { data: existing, error: existingError } = await userClient
+    .from('bookmarks')
+    .select('*')
+    .eq('user_id', req.user.id)
+    .eq('post_id', post_id)
+    .maybeSingle();
+
+  if (existingError) return res.status(500).json({ success: false, error: existingError.message });
+
+  if (existing) {
+    // Remove bookmark
+    const { error } = await userClient.from('bookmarks').delete().eq('id', existing.id);
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    return res.json({ success: true, bookmarked: false, post_id });
+  } else {
+    // Add bookmark
+    const { error } = await userClient.from('bookmarks').insert([{ user_id: req.user.id, post_id }]);
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    return res.json({ success: true, bookmarked: true, post_id });
+  }
+});
+
+
 
 /* --- COMMENTS --- */
 app.post('/api/comment/add', authenticate, async (req, res) => {
@@ -317,38 +403,69 @@ app.get('/api/comments/:postId', async (req, res) => {
 /* --- VOTES --- */
 app.post('/api/vote', authenticate, async (req, res) => {
   const { post_id, comment_id, vote_type } = req.body; // vote_type: 1 or -1
-  
+  let totalVotes = null;
+
+  if (!post_id && !comment_id) {
+    return res.status(400).json({ success: false, error: 'post_id or comment_id is required' });
+  }
+
+  if (![1, -1].includes(vote_type)) {
+    return res.status(400).json({ success: false, error: 'vote_type must be 1 or -1' });
+  }
+
   const userClient = getAuthClient(req.headers.authorization);
   // Upsert the vote
   const { data, error } = await userClient
     .from('votes')
-    .upsert([{ 
+    .upsert([{
       user_id: req.user.id,
       post_id: post_id || null,
       comment_id: comment_id || null,
-      vote_type 
+      vote_type
     }], { onConflict: 'user_id,post_id,comment_id' }) // requires unique constraint
     .select();
 
   if (error) return res.status(500).json({ success: false, error: error.message });
-  
-  // Actually updating votes_count in posts/comments should be done via a Supabase DB Trigger or RPC to avoid race conditions.
-  
-  res.json({ success: true, data });
+
+  if (post_id) {
+    const { data: postVotes, error: countError } = await userClient
+      .from('votes')
+      .select('vote_type')
+      .eq('post_id', post_id)
+      .is('comment_id', null);
+
+    if (countError) return res.status(500).json({ success: false, error: countError.message });
+
+    totalVotes = (postVotes || []).reduce((sum, row) => sum + (row.vote_type || 0), 0);
+  }
+
+  if (comment_id) {
+    const { data: commentVotes, error: countError } = await userClient
+      .from('votes')
+      .select('vote_type')
+      .eq('comment_id', comment_id)
+      .is('post_id', null);
+
+    if (countError) return res.status(500).json({ success: false, error: countError.message });
+
+    totalVotes = (commentVotes || []).reduce((sum, row) => sum + (row.vote_type || 0), 0);
+  }
+
+  res.json({ success: true, data, totalVotes });
 });
 
 /* --- SEARCH --- */
 app.get('/api/stats', async (req, res) => {
   const { count: totalClusters } = await supabase.from('communities').select('*', { count: 'exact', head: true });
   const { count: totalNodes } = await supabase.from('users').select('*', { count: 'exact', head: true });
-  
-  res.json({ 
-      success: true, 
-      data: { 
-          totalClusters: totalClusters || 0, 
-          totalNodes: (totalNodes || 0) + 120, // offset for 'premium' feel or just use real count
-          latency: '0.04s' 
-      } 
+
+  res.json({
+    success: true,
+    data: {
+      totalClusters: totalClusters || 0,
+      totalNodes: (totalNodes || 0) + 120, // offset for 'premium' feel or just use real count
+      latency: '0.04s'
+    }
   });
 });
 

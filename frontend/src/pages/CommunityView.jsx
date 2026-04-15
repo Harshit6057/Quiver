@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchCommunityByName, fetchPostsByCommunityName, joinCommunity } from '../api';
+import { fetchCommunityByName, fetchPostsByCommunityName, joinCommunity, vote, toggleBookmark } from '../api';
 
 const CommunityView = ({ user }) => {
   const { community: communityName } = useParams();
@@ -39,6 +39,19 @@ const CommunityView = ({ user }) => {
     if (res.success) {
       loadData(); // Refresh membership status and counts
       window.location.reload(); // Refresh to update global joined communities if needed
+    }
+  };
+
+  const handleVote = async (postId) => {
+    // Optimistic cache update
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, votes_count: (p.votes_count || 0) + 1 } : p));
+    await vote(1, postId);
+  };
+
+  const handleBookmark = async (postId) => {
+    const res = await toggleBookmark(postId);
+    if (res.success) {
+      alert(res.bookmarked ? "Transmitter Bookmarked" : "Bookmark Removed");
     }
   };
 
@@ -150,16 +163,16 @@ const CommunityView = ({ user }) => {
                   
                   <div className="flex items-center justify-between pt-6 border-t border-white/5">
                     <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors cursor-pointer">
+                      <div onClick={() => handleVote(post.id)} className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors cursor-pointer active:scale-95">
                         <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>stat_1</span>
-                        <span className="font-bold text-sm tracking-tight">{post.votes_count}</span>
+                        <span className="font-bold text-sm tracking-tight">{post.votes_count || 0}</span>
                       </div>
                       <Link to={`/post/${post.id}`} className="flex items-center gap-2 text-slate-400 hover:text-secondary transition-colors cursor-pointer">
                         <span className="material-symbols-outlined text-lg">chat_bubble</span>
                         <span className="font-bold text-sm tracking-tight">Discussion</span>
                       </Link>
                     </div>
-                    <span className="material-symbols-outlined text-slate-500 hover:text-white transition-colors cursor-pointer">bookmark</span>
+                    <span onClick={() => handleBookmark(post.id)} className="material-symbols-outlined text-slate-500 hover:text-white transition-colors cursor-pointer active:scale-95">bookmark</span>
                   </div>
                 </article>
               ))

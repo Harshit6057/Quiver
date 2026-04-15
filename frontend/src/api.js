@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient'; // Make sure Supabase is set up in React too, or use purely fetch.
 
-const API_URL = 'http://localhost:5000/api';
+// Use the production URL if defined in environment variables, otherwise fall back to localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 /**
  * Helper to get the JWT token.
@@ -10,7 +11,7 @@ const getAuthHeaders = async () => {
     // Requires supabase client inside the React app
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return {};
-    
+
     return {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`
@@ -113,6 +114,11 @@ export const addComment = async (post_id, content, parent_comment_id = null) => 
     return res.json();
 };
 
+export const fetchCommentsByPostId = async (postId) => {
+    const res = await fetch(`${API_URL}/comments/${postId}`);
+    return res.json();
+};
+
 // -- VOTING --
 export const vote = async (vote_type, post_id = null, comment_id = null) => {
     const headers = await getAuthHeaders();
@@ -123,3 +129,22 @@ export const vote = async (vote_type, post_id = null, comment_id = null) => {
     });
     return res.json();
 };
+
+
+// -- BOOKMARKS --
+export const toggleBookmark = async (post_id) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_URL}/bookmark`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ post_id })
+    });
+    return res.json();
+};
+
+export const fetchBookmarks = async () => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_URL}/bookmarks`, { headers });
+    return res.json();
+};
+
