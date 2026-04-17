@@ -14,6 +14,7 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Bookmarks from './pages/Bookmarks';
 import Trending from './pages/Trending';
+import History from './pages/History';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -171,6 +172,7 @@ function App() {
         <Route path="/u/:username" element={<UserProfile />} />
         <Route path="/post/:id" element={<PostDetail user={user} bookmarkedPostIds={bookmarkedPostIds} onToggleBookmark={handleToggleBookmark} voteCounts={voteCounts} onVoteCountChange={handleVoteCountChange} />} />
         <Route path="/bookmarks" element={<Bookmarks user={user} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />} />
+        <Route path="/history" element={<History user={user} bookmarks={bookmarks} />} />
         <Route path="/trending" element={<Trending />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />

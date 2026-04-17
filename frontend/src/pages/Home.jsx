@@ -53,12 +53,12 @@ const Home = ({ feed, user, bookmarkedPostIds = [], onToggleBookmark, voteCounts
   };
 
   return (
-    <div className="max-w-5xl mx-auto md:px-8">
+    <div className="max-w-5xl mx-auto md:px-8 overflow-x-hidden">
       {/* Feed Header & Tabs */}
       <header className="mb-12 flex flex-col md:flex-row items-start md:items-end justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="text-5xl font-bold tracking-tighter headline-font text-white">The Void</h1>
-          <p className="text-slate-400 font-light">Synthesizing real-time interactions across the network.</p>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tighter headline-font text-white">The Void</h1>
+          <p className="text-sm sm:text-base text-slate-400 font-light max-w-xl">Synthesizing real-time interactions across the network.</p>
         </div>
         <div className="flex items-center bg-surface-container-lowest p-1 rounded-xl">
           <button className="px-6 py-2 rounded-lg bg-surface-container-highest text-primary font-medium text-sm transition-all">For You</button>
@@ -77,7 +77,7 @@ const Home = ({ feed, user, bookmarkedPostIds = [], onToggleBookmark, voteCounts
                 <span className="material-symbols-outlined text-4xl text-primary">sensors_off</span>
               </div>
               <h2 className="text-3xl font-bold text-white mb-4">Your connection is silent</h2>
-              <p className="text-slate-400 max-w-sm mb-8">You haven't joined any communities yet, or there are no transmissions from your network clusters.</p>
+              <p className="text-slate-400 max-w-sm mb-8 text-sm sm:text-base">You haven't joined any communities yet, or there are no transmissions from your network clusters.</p>
               <div className="flex gap-4">
                 <Link to="/explore" className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:scale-105 transition-transform">Explore Nodes</Link>
                 <Link to="/create-community" className="glass-card px-8 py-3 rounded-xl font-bold text-white hover:bg-white/5 transition-colors">Start a Cluster</Link>
@@ -105,7 +105,7 @@ const Home = ({ feed, user, bookmarkedPostIds = [], onToggleBookmark, voteCounts
                 
                 <div className="space-y-4 relative z-10">
                   <Link to={`/post/${post.id}`} className="hover:underline">
-                    <h2 className="text-2xl font-bold headline-font text-on-background leading-tight">{post.title}</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold headline-font text-on-background leading-tight break-words">{post.title}</h2>
                   </Link>
                   <p className="text-slate-400 leading-relaxed font-light line-clamp-3">{post.content}</p>
                 </div>

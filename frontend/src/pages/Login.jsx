@@ -22,7 +22,7 @@ const Login = () => {
   };
 
   return (
-    <div className="bg-surface text-on-surface min-h-[calc(100vh-5rem)] flex items-center justify-center relative px-6 mt-10">
+    <div className="bg-surface text-on-surface min-h-[calc(100vh-5rem)] flex items-center justify-center relative px-4 sm:px-6 mt-8 sm:mt-10 overflow-x-hidden">
       {/* Abstract Background Patterns */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute w-[800px] h-[800px] rounded-full bg-[radial-gradient(circle,_rgba(221,183,255,0.15)_0%,_rgba(183,109,255,0.05)_50%,_rgba(11,19,38,0)_70%)] blur-[80px] top-[-200px] left-[-200px]"></div>
@@ -40,8 +40,8 @@ const Login = () => {
       {/* Login Container */}
       <main className="w-full max-w-xl relative z-10">
         {/* Brand Anchor Header */}
-        <div className="text-center mb-12">
-          <h1 className="font-headline font-extrabold text-5xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-2">
+        <div className="text-center mb-10 sm:mb-12">
+          <h1 className="font-headline font-extrabold text-4xl sm:text-5xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-2">
             Ethereal
           </h1>
           <p className="font-label text-secondary tracking-widest uppercase text-[11px] font-medium opacity-80">
@@ -50,18 +50,18 @@ const Login = () => {
         </div>
 
         {/* Glassmorphism Card */}
-        <div className="bg-[rgba(45,52,73,0.4)] backdrop-blur-[40px] rounded-xl shadow-[0_0_80px_-15px_rgba(221,183,255,0.1)] p-10 md:p-14 border border-white/5 relative overflow-hidden group">
+        <div className="bg-[rgba(45,52,73,0.4)] backdrop-blur-[40px] rounded-xl shadow-[0_0_80px_-15px_rgba(221,183,255,0.1)] p-6 sm:p-10 md:p-14 border border-white/5 relative overflow-hidden group">
           <div className="absolute inset-0 border border-outline-variant/10 rounded-xl pointer-events-none"></div>
           
           <header className="mb-10">
-            <h2 className="font-headline text-3xl text-on-surface font-bold tracking-tight mb-2">Initialize Session</h2>
-            <p className="text-on-surface-variant font-body text-sm leading-relaxed">Enter the terminal to manage your digital vault and activity across the ethereal network.</p>
+            <h2 className="font-headline text-2xl sm:text-3xl text-on-surface font-bold tracking-tight mb-2">Initialize Session</h2>
+            <p className="text-on-surface-variant font-body text-sm leading-relaxed max-w-prose">Enter the terminal to manage your digital vault and activity across the ethereal network.</p>
           </header>
 
           <div className="space-y-6">
             <button 
               onClick={handleGoogleLogin} 
-              className="w-full flex items-center justify-center gap-4 bg-white text-surface-container-lowest py-4 px-6 rounded-lg font-bold tracking-tight hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-[0.98] transition-all duration-300"
+              className="w-full flex items-center justify-center gap-3 sm:gap-4 bg-white text-surface-container-lowest py-4 px-4 sm:px-6 rounded-lg font-bold tracking-tight hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-[0.98] transition-all duration-300"
             >
               <img alt="Google Logo" className="w-6 h-6" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCKEzYb-A2W87aNbmOO4-UZkvIAmu7rXA7Y4XcMreaDUT7nNomjlhCGtAAF-T3K3SYG_8fzBqK3b0wQUzmqWhU_DlEmYrad-I_fZyKbs--zL9fKKnFoWURSEWNCoex3HNO7zqevWgsN8M15ach1-maImNKUvGsV-61smcCKuCqr-bnzYg3Hm0Hc2iQ9JcuJBGpiG7umvB9fhAbYKjomfCbJTcGDHxH6qaepelieChQ0XJze4l0bByNyfBJLZ2rVD4jfFxI_IdwvcLY"/>
               <span className="text-lg">Continue with Google Account</span>
@@ -78,7 +78,7 @@ const Login = () => {
                 <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em] ml-1">Identity Token</label>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant text-xl">alternate_email</span>
-                  <input className="w-full bg-surface-container-lowest border-none text-on-surface placeholder:text-outline-variant/50 pl-12 pr-4 py-4 rounded-lg focus:ring-2 focus:ring-secondary/40 focus:bg-surface-container transition-all outline-none" placeholder="email@nexus.com" type="email" />
+                  <input className="w-full bg-surface-container-lowest border-none text-on-surface placeholder:text-outline-variant/50 pl-12 pr-4 py-4 rounded-lg focus:ring-2 focus:ring-secondary/40 focus:bg-surface-container transition-all outline-none text-sm sm:text-base" placeholder="email@nexus.com" type="email" />
                 </div>
               </div>
               <div className="space-y-2">
@@ -88,12 +88,12 @@ const Login = () => {
                 </div>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant text-xl">lock</span>
-                  <input className="w-full bg-surface-container-lowest border-none text-on-surface placeholder:text-outline-variant/50 pl-12 pr-4 py-4 rounded-lg focus:ring-2 focus:ring-secondary/40 focus:bg-surface-container transition-all outline-none" placeholder="••••••••" type="password" />
+                  <input className="w-full bg-surface-container-lowest border-none text-on-surface placeholder:text-outline-variant/50 pl-12 pr-4 py-4 rounded-lg focus:ring-2 focus:ring-secondary/40 focus:bg-surface-container transition-all outline-none text-sm sm:text-base" placeholder="••••••••" type="password" />
                 </div>
               </div>
               <button 
                 type="submit"
-                className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold text-lg tracking-tight hover:shadow-[0_0_30px_-5px_rgba(221,183,255,0.4)] active:scale-[0.98] transition-all duration-300"
+                className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold text-base sm:text-lg tracking-tight hover:shadow-[0_0_30px_-5px_rgba(221,183,255,0.4)] active:scale-[0.98] transition-all duration-300"
               >
                 Authorize Access
               </button>

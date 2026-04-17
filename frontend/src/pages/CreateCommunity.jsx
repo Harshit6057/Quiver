@@ -40,7 +40,7 @@ const CreateCommunity = () => {
   };
 
   return (
-    <div className="pt-12 pb-12 pr-8 relative overflow-hidden min-h-[calc(100vh-5rem)]">
+    <div className="pt-8 sm:pt-12 pb-12 px-4 sm:pr-8 relative overflow-hidden min-h-[calc(100vh-5rem)] overflow-x-hidden">
       {/* Background decorative elements */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 blur-[120px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-[-5%] left-[20%] w-[400px] h-[400px] bg-secondary/5 blur-[100px] rounded-full pointer-events-none"></div>
@@ -48,13 +48,13 @@ const CreateCommunity = () => {
       <div className="max-w-4xl mx-auto relative z-10 p-4 md:p-8">
         {/* Header Section */}
         <header className="mb-12">
-          <h1 className="text-5xl font-extrabold tracking-tighter text-on-background mb-4 leading-none font-headline">Spawn New <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Community</span></h1>
-          <p className="text-on-surface-variant text-lg max-w-xl leading-relaxed font-body">Initialize a new sovereign cluster in the Ethereal network. Set your parameters and manifest your collective.</p>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tighter text-on-background mb-4 leading-none font-headline">Spawn New <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Community</span></h1>
+          <p className="text-sm sm:text-base lg:text-lg text-on-surface-variant max-w-xl leading-relaxed font-body">Initialize a new sovereign cluster in the Ethereal network. Set your parameters and manifest your collective.</p>
         </header>
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Form Card */}
-          <section className="lg:col-span-7 bg-surface-container-highest/80 backdrop-blur-xl p-6 md:p-10 rounded-xl glass-panel shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/5">
+          <section className="lg:col-span-7 bg-surface-container-highest/80 backdrop-blur-xl p-5 sm:p-6 md:p-10 rounded-xl glass-panel shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/5">
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="space-y-2">
                 <label className="block font-headline text-secondary text-xs uppercase tracking-[0.2em] font-bold" htmlFor="community-name">Protocol Identifier</label>
@@ -94,8 +94,8 @@ const CreateCommunity = () => {
 
           {/* Info/Metadata Section */}
           <aside className="lg:col-span-5 space-y-6">
-            <div className="bg-surface-container-high/40 p-8 rounded-xl border border-white/5">
-              <h3 className="font-headline text-white text-xl mb-4">Initialization Specs</h3>
+            <div className="bg-surface-container-high/40 p-5 sm:p-8 rounded-xl border border-white/5">
+              <h3 className="font-headline text-white text-lg sm:text-xl mb-4">Initialization Specs</h3>
               <ul className="space-y-4">
                 <li className="flex items-center gap-4">
                   <span className="material-symbols-outlined text-secondary">database</span>
@@ -124,17 +124,17 @@ const CreateCommunity = () => {
         </div>
 
         {/* Footer Stats or Context */}
-        <footer className="mt-20 pt-8 border-t border-white/5 flex flex-wrap gap-12">
+        <footer className="mt-14 md:mt-20 pt-8 border-t border-white/5 flex flex-wrap gap-8 sm:gap-12">
           <div className="flex flex-col">
-            <span className="text-secondary font-headline text-3xl font-bold">{stats.totalClusters}</span>
+            <span className="text-secondary font-headline text-2xl sm:text-3xl font-bold">{stats.totalClusters}</span>
             <span className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-headline font-bold">Active Clusters</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-secondary font-headline text-3xl font-bold">{stats.totalNodes}</span>
+            <span className="text-secondary font-headline text-2xl sm:text-3xl font-bold">{stats.totalNodes}</span>
             <span className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-headline font-bold">Total Nodes</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-secondary font-headline text-3xl font-bold">{stats.latency}</span>
+            <span className="text-secondary font-headline text-2xl sm:text-3xl font-bold">{stats.latency}</span>
             <span className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-headline font-bold">Sync Latency</span>
           </div>
         </footer>

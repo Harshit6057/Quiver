@@ -74,21 +74,21 @@ const CommunityView = ({ user }) => {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto p-4 md:p-8 lg:p-12">
+    <div className="max-w-[1400px] mx-auto p-3 sm:p-4 md:p-8 lg:p-12 overflow-x-hidden">
       {/* Hero Header Section */}
       <section className="relative rounded-xl overflow-hidden mb-12 bg-surface-container-low min-h-[300px]">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
         </div>
-        <div className="relative z-10 p-8 lg:p-16 flex flex-col lg:flex-row lg:items-end justify-between gap-8 h-full">
+        <div className="relative z-10 p-6 sm:p-8 lg:p-16 flex flex-col lg:flex-row lg:items-end justify-between gap-6 sm:gap-8 h-full">
           <div className="flex flex-col gap-4 max-w-2xl">
             <div className="flex items-center gap-4 mb-2">
               <span className="px-4 py-1 rounded-full bg-secondary/10 border border-secondary/20 text-secondary text-[10px] font-bold uppercase tracking-[0.2em]">Verified Nexus</span>
               <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">Since {new Date(community.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
             </div>
-            <h1 className="text-6xl md:text-8xl font-headline font-bold tracking-tighter leading-none text-white capitalize">{community.name}</h1>
-            <p className="text-on-surface-variant text-lg leading-relaxed font-light">{community.description || "The premier collective for high-fidelity virtual construction and collaboration."}</p>
-            <div className="flex items-center gap-12 mt-6">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-headline font-bold tracking-tighter leading-none text-white capitalize break-words">{community.name}</h1>
+            <p className="text-sm sm:text-base lg:text-lg text-on-surface-variant leading-relaxed font-light">{community.description || "The premier collective for high-fidelity virtual construction and collaboration."}</p>
+            <div className="flex flex-wrap items-center gap-8 sm:gap-12 mt-6">
               <div className="flex flex-col">
                 <span className="text-4xl font-headline font-bold text-primary tracking-tight">{community.member_count}</span>
                 <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Archivists</span>
@@ -102,20 +102,20 @@ const CommunityView = ({ user }) => {
               </div>
             </div>
           </div>
-          <div className="flex gap-4">
-            <button className="bg-white/5 border border-white/10 px-8 py-4 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-all backdrop-blur-md">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button className="bg-white/5 border border-white/10 px-6 sm:px-8 py-4 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-all backdrop-blur-md">
               <span className="material-symbols-outlined text-slate-300">share</span>
               <span className="font-bold uppercase tracking-widest text-[10px]">Share</span>
             </button>
             {community.owner_id === user?.id ? null : community.is_member || user?.joined_communities?.includes(community.id) ? (
-              <button disabled className="bg-white/10 text-white border border-white/20 px-10 py-4 rounded-xl font-headline font-bold text-lg opacity-80 flex items-center gap-2">
+              <button disabled className="bg-white/10 text-white border border-white/20 px-8 sm:px-10 py-4 rounded-xl font-headline font-bold text-base sm:text-lg opacity-80 flex items-center gap-2">
                 <span className="material-symbols-outlined text-green-400">check_circle</span>
                 Joined
               </button>
             ) : (
               <button 
                 onClick={handleJoin}
-                className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-10 py-4 rounded-xl font-headline font-bold text-lg hover:shadow-[0_0_30px_rgba(221,183,255,0.3)] transition-all active:scale-95"
+                className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-8 sm:px-10 py-4 rounded-xl font-headline font-bold text-base sm:text-lg hover:shadow-[0_0_30px_rgba(221,183,255,0.3)] transition-all active:scale-95"
               >
                 Join Collective
               </button>
@@ -130,24 +130,24 @@ const CommunityView = ({ user }) => {
         {/* Left Column: Posts Feed (Main) */}
         <div className="lg:col-span-8 flex flex-col gap-12">
           {/* Feed Filter Bar */}
-          <div className="flex justify-between items-center px-2">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-2">
             <div className="flex gap-8 overflow-x-auto hide-scrollbar">
-              <button className="text-primary font-headline font-bold text-lg border-b-2 border-primary pb-2 whitespace-nowrap">Latest Nodes</button>
-              <button className="text-slate-500 hover:text-slate-300 font-headline font-bold text-lg pb-2 transition-colors whitespace-nowrap">Trending Pulse</button>
-              <button className="text-slate-500 hover:text-slate-300 font-headline font-bold text-lg pb-2 transition-colors whitespace-nowrap">Top Feed</button>
+              <button className="text-primary font-headline font-bold text-base sm:text-lg border-b-2 border-primary pb-2 whitespace-nowrap">Latest Nodes</button>
+              <button className="text-slate-500 hover:text-slate-300 font-headline font-bold text-base sm:text-lg pb-2 transition-colors whitespace-nowrap">Trending Pulse</button>
+              <button className="text-slate-500 hover:text-slate-300 font-headline font-bold text-base sm:text-lg pb-2 transition-colors whitespace-nowrap">Top Feed</button>
             </div>
           </div>
 
           <div className="flex flex-col gap-8">
             {posts.length === 0 ? (
-              <div className="bg-white/5 rounded-3xl p-16 border border-dashed border-white/10 text-center">
-                <h3 className="text-2xl font-bold text-slate-500 mb-2">Sector is empty</h3>
-                <p className="text-slate-600 mb-8">No transmissions have been recorded in this nexus cluster yet.</p>
+                <div className="bg-white/5 rounded-3xl p-10 sm:p-16 border border-dashed border-white/10 text-center">
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-500 mb-2">Sector is empty</h3>
+                <p className="text-sm sm:text-base text-slate-600 mb-8">No transmissions have been recorded in this nexus cluster yet.</p>
                 <Link to={`/create-post/${community.name}`} className="bg-primary text-white px-8 py-3 rounded-xl font-bold inline-block">Create Post</Link>
               </div>
             ) : (
               posts.map(post => (
-                <article key={post.id} className="bg-surface-container-highest/40 backdrop-blur-xl rounded-xl p-8 outline outline-1 outline-variant/10 hover:outline-variant/30 transition-all group">
+                <article key={post.id} className="bg-surface-container-highest/40 backdrop-blur-xl rounded-xl p-5 sm:p-8 outline outline-1 outline-variant/10 hover:outline-variant/30 transition-all group">
                   <div className="flex items-center gap-4 mb-6">
                     <img className="w-12 h-12 rounded-full border border-primary/20" alt="User" src={post.author?.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${post.author?.username}`} />
                     <div>
@@ -157,9 +157,9 @@ const CommunityView = ({ user }) => {
                     <span className="material-symbols-outlined text-slate-500 ml-auto cursor-pointer">more_vert</span>
                   </div>
                   <Link to={`/post/${post.id}`}>
-                    <h3 className="text-3xl font-headline font-bold mb-4 text-white leading-tight hover:text-primary transition-colors">{post.title}</h3>
+                    <h3 className="text-2xl sm:text-3xl font-headline font-bold mb-4 text-white leading-tight hover:text-primary transition-colors break-words">{post.title}</h3>
                   </Link>
-                  <p className="text-slate-400 text-base leading-relaxed mb-6 font-light">{post.content}</p>
+                  <p className="text-sm sm:text-base text-slate-400 leading-relaxed mb-6 font-light break-words">{post.content}</p>
                   
                   <div className="flex items-center justify-between pt-6 border-t border-white/5">
                     <div className="flex items-center gap-6">

@@ -31,7 +31,7 @@ const Trending = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto md:px-8">
+    <div className="max-w-5xl mx-auto md:px-8 overflow-x-hidden">
       {/* Header */}
       <header className="mb-12 flex flex-col gap-4">
         <div className="flex items-center gap-4">
@@ -39,8 +39,8 @@ const Trending = () => {
             <span className="material-symbols-outlined text-3xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
           </div>
           <div>
-            <h1 className="text-5xl font-bold tracking-tighter headline-font text-white">Heat Waves</h1>
-            <p className="text-slate-400 font-light">The most resonated transmissions across the network in the last 7 cycles.</p>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tighter headline-font text-white">Heat Waves</h1>
+            <p className="text-sm sm:text-base text-slate-400 font-light">The most resonated transmissions across the network in the last 7 cycles.</p>
           </div>
         </div>
       </header>
@@ -54,10 +54,10 @@ const Trending = () => {
           </div>
         ) : (
           posts.map((post, index) => (
-            <div key={post.id} className="glass-card rounded-xl p-8 border border-white/5 space-y-6 group relative overflow-hidden flex flex-col md:flex-row gap-8">
+            <div key={post.id} className="glass-card rounded-xl p-5 sm:p-8 border border-white/5 space-y-6 group relative overflow-hidden flex flex-col md:flex-row gap-6 md:gap-8">
               {/* Rank Badge */}
               <div className="absolute top-0 right-0 p-4">
-                  <span className="text-6xl font-black text-white/5 headline-font">#{index + 1}</span>
+                  <span className="text-4xl sm:text-6xl font-black text-white/5 headline-font">#{index + 1}</span>
               </div>
 
               <div className="flex-1 space-y-6 relative z-10">
@@ -80,7 +80,7 @@ const Trending = () => {
                 
                 <div className="space-y-4">
                   <Link to={`/post/${post.id}`} className="hover:underline block">
-                    <h2 className="text-3xl font-bold headline-font text-on-background leading-tight">{post.title}</h2>
+                    <h2 className="text-2xl sm:text-3xl font-bold headline-font text-on-background leading-tight break-words">{post.title}</h2>
                   </Link>
                   <p className="text-slate-400 leading-relaxed font-light line-clamp-2">{post.content}</p>
                 </div>

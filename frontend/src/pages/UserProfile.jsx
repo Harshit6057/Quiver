@@ -45,44 +45,44 @@ const UserProfile = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-8 md:py-12 overflow-x-hidden">
       {/* Profile Hero Section */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-end mb-20">
-        <div className="lg:col-span-8 flex flex-col md:flex-row gap-8 items-center md:items-end">
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10 items-end mb-12 md:mb-16">
+        <div className="lg:col-span-8 flex flex-col md:flex-row gap-5 md:gap-7 items-center md:items-end">
           <div className="relative group">
             <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-125 group-hover:bg-primary/40 transition-all duration-700"></div>
             <img 
-              className="relative w-48 h-48 rounded-xl glass-card p-2 border-2 border-primary/40 object-cover" 
+              className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-xl glass-card p-2 border-2 border-primary/40 object-cover" 
               alt="User avatar" 
               src={profile.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${profile.username}`} 
             />
           </div>
-          <div className="flex flex-col gap-2 text-center md:text-left">
+          <div className="flex flex-col gap-2 text-center md:text-left max-w-full">
             <span className="text-secondary font-headline tracking-[0.2em] text-[10px] uppercase font-bold">Authorized Entity</span>
-            <h1 className="text-7xl md:text-8xl font-black font-headline tracking-tighter leading-none text-white break-all">{profile.username}</h1>
-            <p className="text-on-surface-variant max-w-md mt-4 text-lg leading-relaxed font-light">Synthesizing digital realities and exploring the silent spaces of the vault cluster.</p>
-            <div className="flex justify-center md:justify-start gap-12 mt-8">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black font-headline tracking-tight leading-[0.95] text-white break-words max-w-full">{profile.username}</h1>
+            <p className="text-on-surface-variant max-w-md mt-3 md:mt-4 text-sm sm:text-base lg:text-lg leading-relaxed font-light">Synthesizing digital realities and exploring the silent spaces of the vault cluster.</p>
+            <div className="flex flex-wrap justify-center md:justify-start gap-7 sm:gap-10 mt-5 md:mt-6">
               <div className="flex flex-col">
-                <span className="text-4xl font-bold font-headline text-primary">{profile.postCount}</span>
+                <span className="text-2xl sm:text-3xl lg:text-[2rem] font-bold font-headline text-primary">{profile.postCount}</span>
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Transmissions</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-4xl font-bold font-headline text-secondary">{profile.clusterCount}</span>
+                <span className="text-2xl sm:text-3xl lg:text-[2rem] font-bold font-headline text-secondary">{profile.clusterCount}</span>
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Connected Clusters</span>
               </div>
             </div>
           </div>
         </div>
-        <div className="lg:col-span-4 flex justify-center lg:justify-end gap-3 z-10 relative pb-4">
-          <button className="px-10 py-5 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-xl font-black uppercase tracking-widest text-xs shadow-[0_0_20px_rgba(221,183,255,0.3)] hover:shadow-[0_0_40px_rgba(221,183,255,0.5)] transition-all active:scale-95">Synchronize</button>
-          <button className="p-5 glass-panel rounded-xl text-white hover:bg-white/10 transition-all border border-white/10">
+        <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col justify-center lg:justify-end gap-3 z-10 relative pb-0 sm:pb-2">
+          <button className="px-6 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-[0_0_20px_rgba(221,183,255,0.3)] hover:shadow-[0_0_40px_rgba(221,183,255,0.5)] transition-all active:scale-95">Synchronize</button>
+          <button className="p-4 sm:p-5 glass-panel rounded-xl text-white hover:bg-white/10 transition-all border border-white/10 self-start sm:self-auto">
             <span className="material-symbols-outlined">share</span>
           </button>
         </div>
       </section>
 
       {/* Bento Grid Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
         
         {/* Recent Posts Feed */}
         <div className="lg:col-span-8 flex flex-col gap-8">
@@ -93,20 +93,20 @@ const UserProfile = () => {
           
           <div className="flex flex-col gap-8">
             {profile.recentPosts.length === 0 ? (
-              <div className="p-20 border-2 border-dashed border-white/5 rounded-3xl text-center">
+              <div className="p-10 sm:p-16 border-2 border-dashed border-white/5 rounded-3xl text-center">
                 <p className="text-slate-500 font-headline italic">No transmissions recorded in this sector.</p>
               </div>
             ) : (
               profile.recentPosts.map(post => (
-                <div key={post.id} className="glass-panel rounded-2xl p-8 hover:border-primary/40 transition-all duration-500 border border-white/5 group">
+                <div key={post.id} className="glass-panel rounded-2xl p-5 sm:p-8 hover:border-primary/40 transition-all duration-500 border border-white/5 group">
                   <div className="flex justify-between items-start mb-6">
                     <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest rounded-full border border-primary/20">{post.community?.name || 'Vortex'}</span>
                     <span className="text-slate-500 text-[10px] font-bold font-headline uppercase">{new Date(post.created_at).toLocaleDateString()}</span>
                   </div>
                   <Link to={`/post/${post.id}`}>
-                    <h4 className="text-3xl font-headline font-black mb-4 leading-tight group-hover:text-primary transition-colors text-white">{post.title}</h4>
+                    <h4 className="text-2xl sm:text-3xl font-headline font-black mb-4 leading-tight group-hover:text-primary transition-colors text-white break-words">{post.title}</h4>
                   </Link>
-                  <p className="text-on-surface-variant text-sm mb-6 leading-relaxed font-light">{post.content?.substring(0, 180)}...</p>
+                  <p className="text-on-surface-variant text-sm mb-6 leading-relaxed font-light break-words">{post.content?.substring(0, 180)}...</p>
                   <div className="flex items-center gap-6 pt-6 border-t border-white/5">
                     <div className="flex items-center gap-2 text-slate-400 group-hover:text-primary transition-colors">
                       <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
@@ -124,17 +124,17 @@ const UserProfile = () => {
         </div>
 
         {/* Sidebar Info */}
-        <div className="lg:col-span-4 space-y-8">
-          <div className="glass-panel rounded-2xl p-8 bg-gradient-to-br from-surface-container-highest/50 to-transparent border border-white/5">
+        <div className="lg:col-span-4 space-y-6 md:space-y-8">
+          <div className="glass-panel rounded-2xl p-5 sm:p-8 bg-gradient-to-br from-surface-container-highest/50 to-transparent border border-white/5">
             <h3 className="font-headline text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-8">Activity Matrix</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-6 bg-white/5 rounded-xl border border-white/5">
+              <div className="p-4 sm:p-6 bg-white/5 rounded-xl border border-white/5">
                 <span className="text-[10px] text-secondary font-black block mb-2 tracking-widest uppercase">Reputation</span>
-                <span className="text-3xl font-headline font-black text-white">1.0</span>
+                <span className="text-2xl sm:text-3xl font-headline font-black text-white">1.0</span>
               </div>
-              <div className="p-6 bg-white/5 rounded-xl border border-white/5">
+              <div className="p-4 sm:p-6 bg-white/5 rounded-xl border border-white/5">
                 <span className="text-[10px] text-primary font-black block mb-2 tracking-widest uppercase">Tier</span>
-                <span className="text-3xl font-headline font-black text-white">ALPHA</span>
+                <span className="text-2xl sm:text-3xl font-headline font-black text-white">ALPHA</span>
               </div>
             </div>
             <div className="mt-10">

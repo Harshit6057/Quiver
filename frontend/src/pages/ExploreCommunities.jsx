@@ -46,14 +46,14 @@ const ExploreCommunities = ({ user }) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-8 md:py-12 overflow-x-hidden">
       {/* Hero Header Section */}
       <section className="mb-16">
         <div className="flex flex-col md:flex-row justify-between items-end gap-8">
           <div className="max-w-2xl">
             <span className="inline-block py-1 px-3 rounded-full bg-secondary/10 text-secondary text-[10px] font-bold uppercase tracking-widest mb-4">Discovery Engine</span>
-            <h1 className="text-5xl md:text-7xl font-headline font-bold tracking-tighter leading-none mb-6">Explore the <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Ether</span></h1>
-            <p className="text-on-surface-variant text-lg max-w-lg font-body leading-relaxed">Connect with specialized clusters of creators, developers, and visionaries within the Ethereal network.</p>
+            <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-headline font-bold tracking-tighter leading-none mb-6 break-words">Explore the <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Ether</span></h1>
+            <p className="text-sm sm:text-base lg:text-lg text-on-surface-variant max-w-lg font-body leading-relaxed">Connect with specialized clusters of creators, developers, and visionaries within the Ethereal network.</p>
           </div>
           <div className="flex flex-wrap gap-4">
             <div className="flex -space-x-3">
@@ -66,17 +66,17 @@ const ExploreCommunities = ({ user }) => {
 
       {/* Community Grid */}
       {communities.length === 0 ? (
-        <div className="text-center py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
-          <h3 className="text-2xl font-bold text-slate-400 mb-4">No communities found</h3>
-          <p className="text-slate-500 mb-8">Be the first to create a new cluster in the Ethereal network.</p>
+          <div className="text-center py-16 sm:py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
+          <h3 className="text-xl sm:text-2xl font-bold text-slate-400 mb-4">No communities found</h3>
+          <p className="text-sm sm:text-base text-slate-500 mb-8">Be the first to create a new cluster in the Ethereal network.</p>
           <Link to="/create-community" className="bg-primary text-white px-8 py-3 rounded-full font-bold">Create Community</Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {communities.map((c) => {
             const isJoined = user?.joined_communities?.includes(c.id);
             return (
-              <div key={c.id} className="glass-card rounded-xl p-8 h-full flex flex-col justify-between hover:-translate-y-1 transition-transform border border-white/5 group">
+              <div key={c.id} className="glass-card rounded-xl p-6 sm:p-8 h-full flex flex-col justify-between hover:-translate-y-1 transition-transform border border-white/5 group">
                 <div>
                   <div className="flex justify-between items-start mb-6">
                     <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -87,7 +87,7 @@ const ExploreCommunities = ({ user }) => {
                     )}
                   </div>
                   <Link to={`/c/${c.name}`} className="block group-hover:text-primary transition-colors">
-                    <h3 className="text-2xl font-headline font-bold mb-2">{c.name}</h3>
+                    <h3 className="text-xl sm:text-2xl font-headline font-bold mb-2 break-words">{c.name}</h3>
                   </Link>
                   <p className="text-slate-400 text-sm leading-relaxed mb-6 line-clamp-2">{c.description}</p>
                 </div>

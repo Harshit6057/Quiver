@@ -114,26 +114,26 @@ const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {},
   if (!post) return <div className="p-12 text-center text-white">Synthesizing...</div>;
 
   return (
-    <div className="max-w-6xl mx-auto flex gap-12 relative flex-col lg:flex-row">
+    <div className="max-w-6xl mx-auto px-3 sm:px-4 flex gap-8 lg:gap-12 relative flex-col lg:flex-row overflow-x-hidden">
       <div className="flex-1">
         {/* Post Hero */}
         <article className="bg-surface-container-high/60 glass-panel rounded-xl overflow-hidden mb-12 neon-glow-primary">
-          <div className="relative h-96 w-full group">
+          <div className="relative h-64 sm:h-80 lg:h-96 w-full group">
             <img alt="Hero Art" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQCNS7r5rupbWBRALpwFUApwvQrBvCviUFSSXPVRQ6dVT5xfmV-PsvG1XZu0K-yYJlKoYy9H5wgwI5YL_oH7itZ41A-vr75jDyGMWHVMSNqFJ0kuZBw5_CNnoTNIGv93j7TK0ptH9gxHLQBEZXYOova8QY1Ht4aXrOIpPvG2uZrLsY8uCtE2Beqh8sH9OP_6D0l89YINXCweOFqu0K7XOnWQcXK_FzvIUivN6uffF-ihRdiY5GOBFNTWdhhMcseUs6hdPS-YF3N7tF" />
             <div className="absolute inset-0 bg-gradient-to-t from-surface-container-high via-transparent to-transparent"></div>
-            <div className="absolute bottom-8 left-8 right-8">
+            <div className="absolute bottom-4 sm:bottom-8 left-4 sm:left-8 right-4 sm:right-8">
               <div className="flex items-center gap-3 mb-4">
                 <span className="px-3 py-1 bg-secondary/20 text-secondary border border-secondary/30 rounded-full text-[10px] font-space-grotesk uppercase tracking-widest">{post.community?.name || 'Void'}</span>
                 <span className="text-slate-400 text-[10px] font-space-grotesk uppercase tracking-widest">• {post.created_at && String(post.created_at).includes('T') ? new Date(post.created_at).toLocaleDateString() : post.created_at}</span>
               </div>
-              <h1 className="text-4xl md:text-6xl font-black text-white font-space-grotesk tracking-tight leading-none mb-4">{post.title}</h1>
+              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white font-space-grotesk tracking-tight leading-none mb-3 sm:mb-4 break-words">{post.title}</h1>
             </div>
           </div>
 
-          <div className="p-8 md:p-12">
-            <div className="flex items-center justify-between mb-8 pb-8 border-b border-white/5">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary">
+          <div className="p-5 sm:p-8 md:p-12">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 pb-8 border-b border-white/5">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 border-primary">
                   <img alt="Author" className="w-full h-full object-cover" src={post.author?.avatar_url || "https://api.dicebear.com/7.x/identicon/svg?seed=fallback"} />
                 </div>
                 <div>
@@ -142,17 +142,17 @@ const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {},
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => handleVote(1)} className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest hover:bg-primary/20 transition-all rounded-full border border-white/5 cursor-pointer active:scale-95">
+                <button onClick={() => handleVote(1)} className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-surface-container-lowest hover:bg-primary/20 transition-all rounded-full border border-white/5 cursor-pointer active:scale-95">
                   <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
                   <span className="text-sm font-bold text-on-surface">{post.votes_count || 0}</span>
                 </button>
-                <button onClick={() => handleVote(-1)} className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest hover:bg-error/20 transition-all rounded-full border border-white/5 cursor-pointer active:scale-95">
+                <button onClick={() => handleVote(-1)} className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-surface-container-lowest hover:bg-error/20 transition-all rounded-full border border-white/5 cursor-pointer active:scale-95">
                   <span className="material-symbols-outlined text-error">thumb_down</span>
                 </button>
-                <button onClick={handleBookmark} className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest hover:bg-secondary/20 transition-all rounded-full border border-white/5 cursor-pointer active:scale-95">
+                <button onClick={handleBookmark} className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-surface-container-lowest hover:bg-secondary/20 transition-all rounded-full border border-white/5 cursor-pointer active:scale-95">
                   <span className={`material-symbols-outlined ${isBookmarked ? 'text-secondary' : 'text-slate-400'}`}>{isBookmarked ? 'bookmark' : 'bookmark_add'}</span>
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest hover:bg-secondary/20 transition-all rounded-full border border-white/5 cursor-pointer active:scale-95">
+                <button className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-surface-container-lowest hover:bg-secondary/20 transition-all rounded-full border border-white/5 cursor-pointer active:scale-95">
                   <span className="material-symbols-outlined text-secondary">share</span>
                 </button>
               </div>
@@ -160,17 +160,17 @@ const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {},
 
             <div className="prose prose-invert max-w-none">
               {post.content.split('\n\n').map((paragraph, idx) => (
-                <p key={idx} className={`${idx === 0 ? 'text-xl font-light mb-6 text-slate-300' : 'text-slate-400 mb-6'} leading-relaxed`}>
+                  <p key={idx} className={`${idx === 0 ? 'text-base sm:text-xl font-light mb-6 text-slate-300' : 'text-slate-400 mb-6'} leading-relaxed`}>
                   {paragraph}
                 </p>
               ))}
-              <div className="bg-surface-container-lowest rounded-xl p-6 border-l-4 border-primary mb-6">
-                <p className="italic text-primary-fixed font-space-grotesk text-lg">
+              <div className="bg-surface-container-lowest rounded-xl p-4 sm:p-6 border-l-4 border-primary mb-6">
+                <p className="italic text-primary-fixed font-space-grotesk text-base sm:text-lg">
                   "The goal isn't to mimic reality, but to invent a more elegant version of it."
                 </p>
               </div>
             </div>
-            <div className="mt-12 flex flex-wrap gap-2">
+            <div className="mt-10 sm:mt-12 flex flex-wrap gap-2">
               <span className="bg-white/5 px-4 py-1.5 rounded-full text-xs text-slate-400 border border-white/10">#architecture</span>
               <span className="bg-white/5 px-4 py-1.5 rounded-full text-xs text-slate-400 border border-white/10">#generative</span>
             </div>
@@ -248,18 +248,18 @@ const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {},
       </div>
 
       {/* Right Sidebar: Contextual Info */}
-      <aside className="w-80 hidden lg:block shrink-0">
+      <aside className="w-full lg:w-80 hidden lg:block shrink-0">
         <div className="space-y-6 sticky top-28">
           <div className="bg-surface-container-low/40 glass-panel p-6 rounded-xl border border-white/5">
-            <h4 className="text-white font-bold font-space-grotesk uppercase tracking-widest text-xs mb-4">Community Metrics</h4>
+            <h4 className="text-white font-bold font-space-grotesk uppercase tracking-widest text-[10px] sm:text-xs mb-4">Community Metrics</h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-surface-container-lowest rounded-lg">
                 <p className="text-slate-500 text-[10px] font-space-grotesk uppercase mb-1">Impact</p>
-                <p className="text-2xl font-black text-primary font-space-grotesk">{impactScore >= 1000 ? `${(impactScore / 1000).toFixed(1)}k` : impactScore}</p>
+                <p className="text-xl sm:text-2xl font-black text-primary font-space-grotesk">{impactScore >= 1000 ? `${(impactScore / 1000).toFixed(1)}k` : impactScore}</p>
               </div>
               <div className="p-4 bg-surface-container-lowest rounded-lg">
                 <p className="text-slate-500 text-[10px] font-space-grotesk uppercase mb-1">Resonance</p>
-                <p className="text-2xl font-black text-secondary font-space-grotesk">{resonance}%</p>
+                <p className="text-xl sm:text-2xl font-black text-secondary font-space-grotesk">{resonance}%</p>
               </div>
             </div>
           </div>
