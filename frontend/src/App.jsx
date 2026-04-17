@@ -26,37 +26,40 @@ function App() {
 
   useEffect(() => {
     let mounted = true;
+    let authStateReceived = false;
 
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (mounted) {
-        if (session) {
-          loadData(false);
-        } else {
-          setLoading(false);
-        }
-      }
-    });
-
+    // On production with OAuth fragments, let onAuthStateChange handle everything
+    // Don't do initial getSession() as it may not have processed fragment yet
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
+      authStateReceived = true;
+      console.log('[Auth Event]', event, { hasSession: !!session, userId: session?.user?.id });
+
       if (session) {
-        // Only consider SIGNED_IN as a redirect trigger if we are on login/landing
-        // and it's not the initial mount session check.
-        // Actually, let's just use loadData and manage navigation there.
-        loadData(event === 'SIGNED_IN');
+        // Redirect on SIGNED_IN event (successful OAuth) or INITIAL_SESSION (page refresh with active session)
+        loadData(event === 'SIGNED_IN' || event === 'INITIAL_SESSION');
       } else {
         setUser(null);
         setFeed([]);
         setBookmarks([]);
         setVoteCounts({});
         setLoading(false);
+        console.log('[Auth] No session found');
       }
     });
 
+    // Fallback: if auth state never fires after 4 seconds, stop loading
+    const timeout = setTimeout(() => {
+      if (mounted && !authStateReceived) {
+        console.warn('[Auth Timeout] No auth state received after 4s, stopping loader');
+        setLoading(false);
+      }
+    }, 4000);
+
     return () => {
       mounted = false;
+      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);
