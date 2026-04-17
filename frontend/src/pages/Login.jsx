@@ -11,7 +11,7 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${siteUrl}/login`,
+          redirectTo: `${siteUrl}/`,
         }
       });
       if (error) throw error;
