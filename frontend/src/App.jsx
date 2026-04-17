@@ -62,16 +62,39 @@ function App() {
   }, []);
 
   const loadData = async (shouldRedirect = false) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setUser(null);
+      setFeed([]);
+      setBookmarks([]);
+      setVoteCounts({});
+      setLoading(false);
+      return;
+    }
+
     try {
+      let resolvedUser = null;
       const u = await fetchCurrentUser();
       if (u && u.success) {
-        setUser(u.data);
-        
-        // Only redirect if explicitly requested (e.g. from SIGNED_IN event)
-        // AND we are on a login or landing page.
-        if (shouldRedirect && (location.pathname === '/login' || location.pathname === '/landing' || location.pathname === '/')) {
-          navigate(`/u/${u.data.username}`);
-        }
+        resolvedUser = u.data;
+      } else {
+        const fallbackUsername = (session.user?.email || 'user').split('@')[0];
+        resolvedUser = {
+          id: session.user?.id,
+          email: session.user?.email,
+          username: fallbackUsername,
+          avatar_url: session.user?.user_metadata?.avatar_url || null,
+          joined_communities: []
+        };
+        console.warn('Backend profile fetch failed; using session fallback user until API is reachable.');
+      }
+
+      setUser(resolvedUser);
+
+      // Only redirect if explicitly requested (e.g. from SIGNED_IN event)
+      // AND we are on a login or landing page.
+      if (shouldRedirect && (location.pathname === '/login' || location.pathname === '/landing' || location.pathname === '/')) {
+        navigate(`/u/${resolvedUser.username}`);
       }
       
       const f = await fetchFeed();

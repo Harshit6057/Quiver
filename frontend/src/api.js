@@ -3,6 +3,10 @@ import { supabase } from './supabaseClient'; // Make sure Supabase is set up in 
 // Use the production URL if defined in environment variables, otherwise fall back to localhost
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && API_URL.includes('localhost')) {
+    console.warn('VITE_API_URL is pointing to localhost in production. Configure Vercel env to your Render backend URL.');
+}
+
 /**
  * Helper to get the JWT token.
  * Assumes the frontend uses Supabase Auth directly to login with Google Oauth.
