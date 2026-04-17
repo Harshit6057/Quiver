@@ -1,11 +1,51 @@
 import { supabase } from './supabaseClient'; // Make sure Supabase is set up in React too, or use purely fetch.
 
 // Use the production URL if defined in environment variables, otherwise fall back to localhost
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = RAW_API_URL
+    .trim()
+    .replace(/([^:]\/)\/+?/g, '$1')
+    .replace(/\/+$/, '');
+
+const apiPath = (path) => `${API_URL}/${String(path).replace(/^\/+/, '')}`;
 
 if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && API_URL.includes('localhost')) {
     console.warn('VITE_API_URL is pointing to localhost in production. Configure Vercel env to your Render backend URL.');
 }
+
+const parseApiResponse = async (res) => {
+    const text = await res.text();
+    let data;
+
+    try {
+        data = text ? JSON.parse(text) : {};
+    } catch {
+        data = null;
+    }
+
+    if (!res.ok) {
+        return {
+            success: false,
+            error: data?.error || `Request failed with status ${res.status}`,
+            status: res.status,
+            raw: text
+        };
+    }
+
+    return data || { success: true };
+};
+
+const apiRequest = async (path, options = {}) => {
+    try {
+        const res = await fetch(apiPath(path), options);
+        return await parseApiResponse(res);
+    } catch (error) {
+        return {
+            success: false,
+            error: error?.message || 'Network error'
+        };
+    }
+};
 
 /**
  * Helper to get the JWT token.
@@ -29,126 +69,109 @@ export const loginWithGoogle = async () => {
 
 export const fetchCurrentUser = async () => {
     const headers = await getAuthHeaders();
-    const res = await fetch(`${API_URL}/user`, { headers });
-    return res.json();
+    return apiRequest('user', { headers });
 };
 
 export const fetchProfile = async (username) => {
-    const res = await fetch(`${API_URL}/user/profile/${username}`);
-    return res.json();
+    return apiRequest(`user/profile/${username}`);
 };
 
 // -- COMMUNITY --
 export const createCommunity = async (name, description) => {
     const headers = await getAuthHeaders();
-    const res = await fetch(`${API_URL}/community/create`, {
+    return apiRequest('community/create', {
         method: 'POST',
         headers,
         body: JSON.stringify({ name, description })
     });
-    return res.json();
 };
 
 export const joinCommunity = async (community_id) => {
     const headers = await getAuthHeaders();
-    const res = await fetch(`${API_URL}/community/join`, {
+    return apiRequest('community/join', {
         method: 'POST',
         headers,
         body: JSON.stringify({ community_id })
     });
-    return res.json();
 };
 
 export const fetchAllCommunities = async () => {
-    const res = await fetch(`${API_URL}/community/all`);
-    return res.json();
+    return apiRequest('community/all');
 };
 
 export const fetchCommunityByName = async (name) => {
     const headers = await getAuthHeaders();
-    const res = await fetch(`${API_URL}/community/name/${name}`, { headers });
-    return res.json();
+    return apiRequest(`community/name/${name}`, { headers });
 };
 
 export const fetchPostsByCommunityName = async (name) => {
-    const res = await fetch(`${API_URL}/posts/comm-name/${name}`);
-    return res.json();
+    return apiRequest(`posts/comm-name/${name}`);
 };
 
 export const fetchStats = async () => {
-    const res = await fetch(`${API_URL}/stats`);
-    return res.json();
+    return apiRequest('stats');
 };
 
 // -- POSTS --
 export const fetchFeed = async () => {
     const headers = await getAuthHeaders(); // required for tailored feed
-    const res = await fetch(`${API_URL}/posts/feed`, { headers });
-    return res.json();
+    return apiRequest('posts/feed', { headers });
 };
 
 export const fetchTrendingPosts = async () => {
-    const res = await fetch(`${API_URL}/posts/trending`);
-    return res.json();
+    return apiRequest('posts/trending');
 };
 
 export const createPost = async (community_id, title, content) => {
     const headers = await getAuthHeaders();
-    const res = await fetch(`${API_URL}/post/create`, {
+    return apiRequest('post/create', {
         method: 'POST',
         headers,
         body: JSON.stringify({ community_id, title, content })
     });
-    return res.json();
 };
 
 export const fetchPostById = async (id) => {
-    const res = await fetch(`${API_URL}/post/${id}`);
-    return res.json();
+    return apiRequest(`post/${id}`);
 };
 
 // -- COMMENTS --
 export const addComment = async (post_id, content, parent_comment_id = null) => {
     const headers = await getAuthHeaders();
-    const res = await fetch(`${API_URL}/comment/add`, {
+    return apiRequest('comment/add', {
         method: 'POST',
         headers,
         body: JSON.stringify({ post_id, content, parent_comment_id })
     });
-    return res.json();
 };
 
 export const fetchCommentsByPostId = async (postId) => {
-    const res = await fetch(`${API_URL}/comments/${postId}`);
-    return res.json();
+    return apiRequest(`comments/${postId}`);
 };
 
 // -- VOTING --
 export const vote = async (vote_type, post_id = null, comment_id = null) => {
     const headers = await getAuthHeaders();
-    const res = await fetch(`${API_URL}/vote`, {
+    return apiRequest('vote', {
         method: 'POST',
         headers,
         body: JSON.stringify({ vote_type, post_id, comment_id })
     });
-    return res.json();
 };
 
 
 // -- BOOKMARKS --
 export const toggleBookmark = async (post_id) => {
     const headers = await getAuthHeaders();
-    const res = await fetch(`${API_URL}/bookmark`, {
+    return apiRequest('bookmark', {
         method: 'POST',
         headers,
         body: JSON.stringify({ post_id })
     });
-    return res.json();
 };
 
 export const fetchBookmarks = async () => {
     const headers = await getAuthHeaders();
-    const res = await fetch(`${API_URL}/bookmarks`, { headers });
-    return res.json();
+    return apiRequest('bookmarks', { headers });
 };
 
