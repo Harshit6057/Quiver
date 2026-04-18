@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import multer from 'multer';
 import { supabase, getAuthClient } from './supabaseClient.js';
 
 dotenv.config();
@@ -8,6 +9,12 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024
+  }
+});
 
 const withPostVoteCounts = async (posts) => {
   if (!posts || posts.length === 0) return [];
@@ -217,8 +224,58 @@ app.get('/api/community/name/:name', async (req, res) => {
 });
 
 /* --- POSTS --- */
+app.post('/api/post/upload-media', authenticate, upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'File is required' });
+  }
+
+  const allowedMimePrefixes = ['image/', 'video/'];
+  const allowedDocumentMimes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain'
+  ];
+
+  const mimetype = req.file.mimetype || 'application/octet-stream';
+  const isAllowed = allowedMimePrefixes.some(prefix => mimetype.startsWith(prefix)) || allowedDocumentMimes.includes(mimetype);
+  if (!isAllowed) {
+    return res.status(400).json({ success: false, error: 'Unsupported file type' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const filePath = `${req.user.id}/${Date.now()}_${safeName}`;
+
+  const { error: uploadError } = await userClient
+    .storage
+    .from('post-media')
+    .upload(filePath, req.file.buffer, {
+      contentType: mimetype,
+      upsert: false
+    });
+
+  if (uploadError) {
+    return res.status(500).json({ success: false, error: uploadError.message });
+  }
+
+  const { data: publicData } = userClient.storage.from('post-media').getPublicUrl(filePath);
+  const mediaType = mimetype.startsWith('image/') ? 'image' : (mimetype.startsWith('video/') ? 'video' : 'document');
+
+  return res.json({
+    success: true,
+    data: {
+      url: publicData.publicUrl,
+      type: mediaType,
+      name: req.file.originalname,
+      mime: mimetype,
+      size: req.file.size
+    }
+  });
+});
+
 app.post('/api/post/create', authenticate, async (req, res) => {
-  const { community_id, title, content } = req.body;
+  const { community_id, title, content, media } = req.body;
 
   const userClient = getAuthClient(req.headers.authorization);
   // Check if member
@@ -231,9 +288,21 @@ app.post('/api/post/create', authenticate, async (req, res) => {
 
   if (!membership) return res.status(403).json({ success: false, error: 'Must join community to post' });
 
+  const safeMedia = Array.isArray(media)
+    ? media
+        .filter((item) => item && typeof item.url === 'string')
+        .map((item) => ({
+          url: item.url,
+          type: ['image', 'video', 'document'].includes(item.type) ? item.type : 'document',
+          name: item.name || '',
+          mime: item.mime || '',
+          size: Number(item.size) || 0
+        }))
+    : [];
+
   const { data, error } = await userClient
     .from('posts')
-    .insert([{ community_id, author_id: req.user.id, title, content }])
+    .insert([{ community_id, author_id: req.user.id, title, content, media: safeMedia }])
     .select()
     .single();
 

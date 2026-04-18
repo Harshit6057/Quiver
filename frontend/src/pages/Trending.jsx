@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchTrendingPosts } from '../api';
+import PostMediaRenderer from '../components/PostMediaRenderer';
 
 const Trending = () => {
   const [posts, setPosts] = useState([]);
@@ -83,6 +84,7 @@ const Trending = () => {
                     <h2 className="text-2xl sm:text-3xl font-bold headline-font text-on-background leading-tight break-words">{post.title}</h2>
                   </Link>
                   <p className="text-slate-400 leading-relaxed font-light line-clamp-2">{post.content}</p>
+                  <PostMediaRenderer media={post.media} />
                 </div>
                 
                 <div className="flex items-center justify-between pt-4">

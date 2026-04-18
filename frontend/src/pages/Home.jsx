@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchAllCommunities, vote } from '../api';
+import PostMediaRenderer from '../components/PostMediaRenderer';
 
 const Home = ({ feed, user, bookmarkedPostIds = [], onToggleBookmark, voteCounts = {}, onVoteCountChange }) => {
   const [sidebarCommunities, setSidebarCommunities] = useState([]);
@@ -108,6 +109,7 @@ const Home = ({ feed, user, bookmarkedPostIds = [], onToggleBookmark, voteCounts
                     <h2 className="text-xl sm:text-2xl font-bold headline-font text-on-background leading-tight break-words">{post.title}</h2>
                   </Link>
                   <p className="text-slate-400 leading-relaxed font-light line-clamp-3">{post.content}</p>
+                  <PostMediaRenderer media={post.media} />
                 </div>
                 
                 <div className="flex items-center justify-between pt-4 relative z-10">

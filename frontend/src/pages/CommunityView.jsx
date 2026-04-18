@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchCommunityByName, fetchPostsByCommunityName, joinCommunity, vote, toggleBookmark } from '../api';
+import PostMediaRenderer from '../components/PostMediaRenderer';
 
 const CommunityView = ({ user }) => {
   const { community: communityName } = useParams();
@@ -160,6 +161,7 @@ const CommunityView = ({ user }) => {
                     <h3 className="text-2xl sm:text-3xl font-headline font-bold mb-4 text-white leading-tight hover:text-primary transition-colors break-words">{post.title}</h3>
                   </Link>
                   <p className="text-sm sm:text-base text-slate-400 leading-relaxed mb-6 font-light break-words">{post.content}</p>
+                  <PostMediaRenderer media={post.media} />
                   
                   <div className="flex items-center justify-between pt-6 border-t border-white/5">
                     <div className="flex items-center gap-6">

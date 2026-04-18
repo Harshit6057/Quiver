@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchProfile } from '../api';
+import PostMediaRenderer from '../components/PostMediaRenderer';
 
 const UserProfile = () => {
   const { username } = useParams();
@@ -107,6 +108,7 @@ const UserProfile = () => {
                     <h4 className="text-2xl sm:text-3xl font-headline font-black mb-4 leading-tight group-hover:text-primary transition-colors text-white break-words">{post.title}</h4>
                   </Link>
                   <p className="text-on-surface-variant text-sm mb-6 leading-relaxed font-light break-words">{post.content?.substring(0, 180)}...</p>
+                  <PostMediaRenderer media={post.media} />
                   <div className="flex items-center gap-6 pt-6 border-t border-white/5">
                     <div className="flex items-center gap-2 text-slate-400 group-hover:text-primary transition-colors">
                       <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>

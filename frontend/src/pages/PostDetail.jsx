@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { addComment, fetchCommentsByPostId, fetchPostById, fetchPostsByCommunityName, vote } from '../api';
+import PostMediaRenderer from '../components/PostMediaRenderer';
 
 // import { fetchPostById } from '../api';
 
@@ -164,6 +165,7 @@ const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {},
                   {paragraph}
                 </p>
               ))}
+              <PostMediaRenderer media={post.media} />
               <div className="bg-surface-container-lowest rounded-xl p-4 sm:p-6 border-l-4 border-primary mb-6">
                 <p className="italic text-primary-fixed font-space-grotesk text-base sm:text-lg">
                   "The goal isn't to mimic reality, but to invent a more elegant version of it."

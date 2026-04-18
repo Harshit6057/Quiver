@@ -35,6 +35,7 @@ CREATE TABLE public.posts (
   author_id uuid REFERENCES public.users(id) ON DELETE CASCADE,
   title text NOT NULL,
   content text,
+  media jsonb DEFAULT '[]'::jsonb,
   votes_count integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -117,3 +118,16 @@ CREATE TABLE public.bookmarks (
 
 ALTER TABLE public.bookmarks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can manage their bookmarks" ON public.bookmarks FOR ALL USING (auth.uid() = user_id);
+
+-- Storage bucket for post attachments (images/videos/documents)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('post-media', 'post-media', true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Public can view post media"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'post-media');
+
+CREATE POLICY "Authenticated users can upload post media"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'post-media' AND auth.role() = 'authenticated');

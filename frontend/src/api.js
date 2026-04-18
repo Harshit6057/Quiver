@@ -62,6 +62,11 @@ const getAuthHeaders = async () => {
     };
 };
 
+const getAuthToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+};
+
 // -- AUTH -- 
 export const loginWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google' });
@@ -122,12 +127,30 @@ export const fetchTrendingPosts = async () => {
     return apiRequest('posts/trending');
 };
 
-export const createPost = async (community_id, title, content) => {
+export const createPost = async (community_id, title, content, media = []) => {
     const headers = await getAuthHeaders();
     return apiRequest('post/create', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ community_id, title, content })
+        body: JSON.stringify({ community_id, title, content, media })
+    });
+};
+
+export const uploadPostMedia = async (file) => {
+    const token = await getAuthToken();
+    if (!token) {
+        return { success: false, error: 'Not authenticated' };
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return apiRequest('post/upload-media', {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`
+        },
+        body: formData
     });
 };
 
