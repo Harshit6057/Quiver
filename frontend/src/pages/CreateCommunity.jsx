@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createCommunity, fetchStats } from '../api';
+import { createCommunity, fetchStats, uploadPostMedia } from '../api';
 
 const CreateCommunity = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
   const [stats, setStats] = useState({ totalClusters: 0, totalNodes: 0, latency: '0.00s' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -17,13 +19,35 @@ const CreateCommunity = () => {
     loadStats();
   }, []);
 
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreview('');
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(imageFile);
+    setImagePreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [imageFile]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !description) return;
     
     setIsSubmitting(true);
     try {
-      const res = await createCommunity(name, description);
+      let image_url = null;
+      if (imageFile) {
+        const uploadRes = await uploadPostMedia(imageFile);
+        if (!uploadRes.success) {
+          alert(uploadRes.error || 'Failed to upload community photo');
+          setIsSubmitting(false);
+          return;
+        }
+        image_url = uploadRes.data.url;
+      }
+
+      const res = await createCommunity(name, description, image_url);
       if (res.success) {
         // Navigate using the name as slug (assuming backend creates name)
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -79,6 +103,16 @@ const CreateCommunity = () => {
                   rows="5"
                   required
                 ></textarea>
+              </div>
+              <div className="space-y-3">
+                <label className="block font-headline text-secondary text-xs uppercase tracking-[0.2em] font-bold">Community Photo</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                  className="w-full bg-surface-container-lowest border-none rounded-xl py-4 px-6 text-on-surface"
+                />
+                {imagePreview && <img src={imagePreview} alt="Community preview" className="w-full max-h-56 object-cover rounded-xl border border-white/10" />}
               </div>
               <div className="pt-4">
                 <button 

@@ -5,6 +5,7 @@ import { fetchAllCommunities, joinCommunity } from '../api';
 const ExploreCommunities = ({ user }) => {
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('all');
 
   useEffect(() => {
     loadCommunities();
@@ -37,6 +38,14 @@ const ExploreCommunities = ({ user }) => {
     }
   };
 
+  const joinedIds = new Set(user?.joined_communities || []);
+  const filteredCommunities = communities.filter((community) => {
+    const isJoined = joinedIds.has(community.id);
+    if (viewMode === 'mine') return isJoined;
+    if (viewMode === 'others') return !isJoined;
+    return true;
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -64,16 +73,33 @@ const ExploreCommunities = ({ user }) => {
         </div>
       </section>
 
+      <div className="flex flex-wrap gap-3 mb-8">
+        {[
+          { key: 'all', label: 'All Communities' },
+          { key: 'mine', label: 'My Communities' },
+          { key: 'others', label: 'Other Communities' }
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setViewMode(tab.key)}
+            className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest border transition-all ${viewMode === tab.key ? 'bg-primary text-white border-primary' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white hover:border-white/20'}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Community Grid */}
-      {communities.length === 0 ? (
+      {filteredCommunities.length === 0 ? (
           <div className="text-center py-16 sm:py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
           <h3 className="text-xl sm:text-2xl font-bold text-slate-400 mb-4">No communities found</h3>
-          <p className="text-sm sm:text-base text-slate-500 mb-8">Be the first to create a new cluster in the Ethereal network.</p>
+          <p className="text-sm sm:text-base text-slate-500 mb-8">Try another filter or create a new cluster in the Ethereal network.</p>
           <Link to="/create-community" className="bg-primary text-white px-8 py-3 rounded-full font-bold">Create Community</Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-          {communities.map((c) => {
+          {filteredCommunities.map((c) => {
             const isJoined = user?.joined_communities?.includes(c.id);
             return (
               <div key={c.id} className="glass-card rounded-xl p-6 sm:p-8 h-full flex flex-col justify-between hover:-translate-y-1 transition-transform border border-white/5 group">

@@ -126,13 +126,13 @@ app.get('/api/user/profile/:username', async (req, res) => {
 
 /* --- COMMUNITY --- */
 app.post('/api/community/create', authenticate, async (req, res) => {
-  const { name, description } = req.body;
+  const { name, description, image_url } = req.body;
   const userClient = getAuthClient(req.headers.authorization);
 
   // 1. Create the community
   const { data: community, error: cError } = await userClient
     .from('communities')
-    .insert([{ name, description, owner_id: req.user.id }])
+    .insert([{ name, description, owner_id: req.user.id, image_url: image_url || null }])
     .select()
     .single();
 
@@ -146,6 +146,44 @@ app.post('/api/community/create', authenticate, async (req, res) => {
   if (mError) console.error("Failed to add owner as member:", mError);
 
   res.json({ success: true, data: community });
+});
+
+app.post('/api/user/avatar', authenticate, async (req, res) => {
+  const { avatar_url } = req.body;
+  if (!avatar_url) {
+    return res.status(400).json({ success: false, error: 'avatar_url is required' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const { data, error } = await userClient
+    .from('users')
+    .update({ avatar_url })
+    .eq('id', req.user.id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  res.json({ success: true, data });
+});
+
+app.post('/api/community/photo', authenticate, async (req, res) => {
+  const { community_id, image_url } = req.body;
+  if (!community_id || !image_url) {
+    return res.status(400).json({ success: false, error: 'community_id and image_url are required' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const { data, error } = await userClient
+    .from('communities')
+    .update({ image_url })
+    .eq('id', community_id)
+    .eq('owner_id', req.user.id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  if (!data) return res.status(403).json({ success: false, error: 'Only the owner can update community photo' });
+  res.json({ success: true, data });
 });
 
 app.post('/api/community/join', authenticate, async (req, res) => {
@@ -540,13 +578,33 @@ app.get('/api/stats', async (req, res) => {
 
 app.get('/api/search', async (req, res) => {
   const { q } = req.query;
-  const { data, error } = await supabase
-    .from('posts')
-    .select('*, community:communities(name)')
-    .ilike('title', `%${q}%`); // search title
+  const query = (q || '').trim();
 
-  if (error) return res.status(500).json({ success: false, error: error.message });
-  res.json({ success: true, data });
+  if (!query) {
+    return res.json({ success: true, data: { posts: [], communities: [], users: [] } });
+  }
+
+  const [{ data: posts, error: postsError }, { data: communities, error: communitiesError }, { data: users, error: usersError }] = await Promise.all([
+    supabase
+    .from('posts')
+    .select('*, author:users(username, avatar_url), community:communities(name)')
+    .or(`title.ilike.%${query}%,content.ilike.%${query}%`),
+    supabase
+      .from('communities')
+      .select('*')
+      .or(`name.ilike.%${query}%,description.ilike.%${query}%`),
+    supabase
+      .from('users')
+      .select('id, username, avatar_url')
+      .ilike('username', `%${query}%`)
+  ]);
+
+  if (postsError) return res.status(500).json({ success: false, error: postsError.message });
+  if (communitiesError) return res.status(500).json({ success: false, error: communitiesError.message });
+  if (usersError) return res.status(500).json({ success: false, error: usersError.message });
+
+  const postsWithVotes = await withPostVoteCounts(posts || []);
+  res.json({ success: true, data: { posts: postsWithVotes, communities: communities || [], users: users || [] } });
 });
 
 const PORT = process.env.PORT || 5000;

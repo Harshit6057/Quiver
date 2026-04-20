@@ -15,6 +15,7 @@ import Login from './pages/Login';
 import Bookmarks from './pages/Bookmarks';
 import Trending from './pages/Trending';
 import History from './pages/History';
+import SearchResults from './pages/SearchResults';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -152,6 +153,10 @@ function App() {
     navigate('/login');
   };
 
+  const handleUserUpdated = (updatedUser) => {
+    setUser((prev) => ({ ...(prev || {}), ...updatedUser }));
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -169,10 +174,11 @@ function App() {
         <Route path="/create-community" element={<CreateCommunity />} />
         <Route path="/create-post" element={<CreatePost user={user} />} />
         <Route path="/create-post/:community" element={<CreatePost user={user} />} />
-        <Route path="/u/:username" element={<UserProfile />} />
+        <Route path="/u/:username" element={<UserProfile user={user} onUserUpdated={handleUserUpdated} />} />
         <Route path="/post/:id" element={<PostDetail user={user} bookmarkedPostIds={bookmarkedPostIds} onToggleBookmark={handleToggleBookmark} voteCounts={voteCounts} onVoteCountChange={handleVoteCountChange} />} />
         <Route path="/bookmarks" element={<Bookmarks user={user} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />} />
         <Route path="/history" element={<History user={user} bookmarks={bookmarks} />} />
+        <Route path="/search" element={<SearchResults user={user} />} />
         <Route path="/trending" element={<Trending />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />

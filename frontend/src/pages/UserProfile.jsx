@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchProfile } from '../api';
+import { fetchProfile, updateUserAvatar, uploadPostMedia } from '../api';
 import PostMediaRenderer from '../components/PostMediaRenderer';
 
-const UserProfile = () => {
+const UserProfile = ({ user, onUserUpdated }) => {
   const { username } = useParams();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const avatarInputRef = useRef(null);
 
   const loadProfile = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -56,6 +58,32 @@ const UserProfile = () => {
     }
   };
 
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || user?.id !== profile?.id) return;
+
+    setUploadingPhoto(true);
+    try {
+      const uploadRes = await uploadPostMedia(file);
+      if (!uploadRes?.success) {
+        alert(uploadRes?.error || 'Failed to upload profile photo');
+        return;
+      }
+
+      const updateRes = await updateUserAvatar(uploadRes.data.url);
+      if (!updateRes?.success) {
+        alert(updateRes?.error || 'Failed to save profile photo');
+        return;
+      }
+
+      setProfile(updateRes.data);
+      onUserUpdated?.(updateRes.data);
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = '';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -85,6 +113,22 @@ const UserProfile = () => {
               alt="User avatar" 
               src={profile.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${profile.username}`} 
             />
+            {user?.id === profile.id && (
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-background/90 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white"
+              >
+                {uploadingPhoto ? 'Uploading...' : 'Change Photo'}
+              </button>
+            )}
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              className="hidden"
+            />
           </div>
           <div className="flex flex-col gap-2 text-center md:text-left max-w-full">
             <span className="text-secondary font-headline tracking-[0.2em] text-[10px] uppercase font-bold">Authorized Entity</span>
@@ -107,16 +151,17 @@ const UserProfile = () => {
             type="button"
             onClick={handleSynchronize}
             disabled={syncing}
-            className="px-6 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-[0_0_20px_rgba(221,183,255,0.3)] hover:shadow-[0_0_40px_rgba(221,183,255,0.5)] transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-4 sm:px-6 py-3 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-[0_0_20px_rgba(221,183,255,0.3)] hover:shadow-[0_0_40px_rgba(221,183,255,0.5)] transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {syncing ? 'Synchronizing...' : 'Synchronize'}
           </button>
           <button
             type="button"
             onClick={handleShare}
-            className="p-4 sm:p-5 glass-panel rounded-xl text-white hover:bg-white/10 transition-all border border-white/10 self-start sm:self-auto"
+            className="w-full sm:w-auto px-4 py-3 sm:p-5 glass-panel rounded-xl text-white hover:bg-white/10 transition-all border border-white/10 self-start sm:self-auto flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined">share</span>
+            <span className="sm:hidden text-[10px] font-bold uppercase tracking-widest">Share</span>
           </button>
         </div>
       </section>

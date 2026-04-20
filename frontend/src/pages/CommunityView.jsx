@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchCommunityByName, fetchPostsByCommunityName, joinCommunity, vote, toggleBookmark } from '../api';
+import { fetchCommunityByName, fetchPostsByCommunityName, joinCommunity, vote, toggleBookmark, updateCommunityPhoto, uploadPostMedia } from '../api';
 import PostMediaRenderer from '../components/PostMediaRenderer';
 
 const CommunityView = ({ user }) => {
@@ -8,6 +8,8 @@ const CommunityView = ({ user }) => {
   const [community, setCommunity] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const communityPhotoInputRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -56,6 +58,31 @@ const CommunityView = ({ user }) => {
     }
   };
 
+  const handleCommunityPhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || community?.owner_id !== user?.id) return;
+
+    setUploadingPhoto(true);
+    try {
+      const uploadRes = await uploadPostMedia(file);
+      if (!uploadRes?.success) {
+        alert(uploadRes?.error || 'Failed to upload community photo');
+        return;
+      }
+
+      const updateRes = await updateCommunityPhoto(community.id, uploadRes.data.url);
+      if (!updateRes?.success) {
+        alert(updateRes?.error || 'Failed to save community photo');
+        return;
+      }
+
+      setCommunity(updateRes.data);
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = '';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -79,6 +106,9 @@ const CommunityView = ({ user }) => {
       {/* Hero Header Section */}
       <section className="relative rounded-xl overflow-hidden mb-12 bg-surface-container-low min-h-[300px]">
         <div className="absolute inset-0 z-0">
+          {community.image_url ? (
+            <img src={community.image_url} alt={`${community.name} cover`} className="absolute inset-0 w-full h-full object-cover opacity-30" />
+          ) : null}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
         </div>
         <div className="relative z-10 p-6 sm:p-8 lg:p-16 flex flex-col lg:flex-row lg:items-end justify-between gap-6 sm:gap-8 h-full">
@@ -102,6 +132,24 @@ const CommunityView = ({ user }) => {
                 <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Active Now</span>
               </div>
             </div>
+            {community.owner_id === user?.id && (
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => communityPhotoInputRef.current?.click()}
+                  className="px-4 py-2 rounded-lg bg-white/10 border border-white/15 text-white text-[10px] font-bold uppercase tracking-widest"
+                >
+                  {uploadingPhoto ? 'Updating...' : 'Change Community Photo'}
+                </button>
+                <input
+                  ref={communityPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCommunityPhotoUpload}
+                  className="hidden"
+                />
+              </div>
+            )}
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
             <button className="bg-white/5 border border-white/10 px-6 sm:px-8 py-4 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-all backdrop-blur-md">

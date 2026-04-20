@@ -82,12 +82,30 @@ export const fetchProfile = async (username) => {
 };
 
 // -- COMMUNITY --
-export const createCommunity = async (name, description) => {
+export const createCommunity = async (name, description, image_url = null) => {
     const headers = await getAuthHeaders();
     return apiRequest('community/create', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ name, description })
+        body: JSON.stringify({ name, description, image_url })
+    });
+};
+
+export const updateUserAvatar = async (avatar_url) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('user/avatar', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ avatar_url })
+    });
+};
+
+export const updateCommunityPhoto = async (community_id, image_url) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('community/photo', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ community_id, image_url })
     });
 };
 
@@ -196,5 +214,9 @@ export const toggleBookmark = async (post_id) => {
 export const fetchBookmarks = async () => {
     const headers = await getAuthHeaders();
     return apiRequest('bookmarks', { headers });
+};
+
+export const searchEverything = async (query) => {
+    return apiRequest(`search?q=${encodeURIComponent(query || '')}`);
 };
 

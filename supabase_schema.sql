@@ -15,6 +15,7 @@ CREATE TABLE public.communities (
   owner_id uuid REFERENCES public.users(id) NOT NULL,
   name text UNIQUE NOT NULL,
   description text,
+  image_url text,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

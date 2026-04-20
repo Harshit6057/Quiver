@@ -6,6 +6,7 @@ const Layout = ({ children, user, handleLogin }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -14,6 +15,13 @@ const Layout = ({ children, user, handleLogin }) => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/');
+  };
+  const handleSearch = (event) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
+    navigate(`/search?q=${encodeURIComponent(query)}`);
+    setMobileMenuOpen(false);
   };
   const activeClass = "bg-purple-500/10 text-purple-300 border-r-4 border-purple-500 px-6 py-4 flex items-center gap-4 group transition-all duration-300";
   const inactiveClass = "text-slate-500 hover:text-slate-300 px-6 py-4 flex items-center gap-4 group transition-all duration-300 hover:bg-white/5 border-r-4 border-transparent";
@@ -39,10 +47,17 @@ const Layout = ({ children, user, handleLogin }) => {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-4 md:gap-6">
-          <div className="hidden lg:flex items-center bg-surface-container-lowest rounded-full px-4 py-2 gap-3 outline-variant/10 border border-transparent focus-within:border-secondary transition-all">
+          <form onSubmit={handleSearch} className="hidden lg:flex items-center bg-surface-container-lowest rounded-full px-4 py-2 gap-3 outline-variant/10 border border-transparent focus-within:border-secondary transition-all">
             <span className="material-symbols-outlined text-slate-400 text-sm">search</span>
-            <input className="bg-transparent border-none focus:ring-0 outline-none text-sm w-44 xl:w-64 text-on-surface" placeholder="Search the void..." type="text"/>
-          </div>
+            <input
+              className="bg-transparent border-none focus:ring-0 outline-none text-sm w-44 xl:w-64 text-on-surface"
+              placeholder="Search the void..."
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button type="submit" className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Go</button>
+          </form>
           <div className="flex items-center gap-4">
             <Link to="/create-community" className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-4 sm:px-6 py-2 rounded-full font-headline font-bold text-xs sm:text-sm hover:opacity-90 active:scale-95 transition-all">Create</Link>
             <button className="material-symbols-outlined text-slate-400 hover:text-white transition-colors hidden sm:inline-flex">notifications</button>
@@ -93,6 +108,18 @@ const Layout = ({ children, user, handleLogin }) => {
             </div>
 
             <nav className="flex flex-col gap-1 px-2 py-4 flex-1 overflow-y-auto">
+              <form onSubmit={handleSearch} className="px-4 pb-4 lg:hidden">
+                <div className="flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+                  <span className="material-symbols-outlined text-slate-400 text-sm">search</span>
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search the void..."
+                    className="bg-transparent border-none outline-none focus:ring-0 flex-1 text-sm text-white placeholder:text-slate-500"
+                  />
+                </div>
+                <button type="submit" className="mt-3 w-full py-2 rounded-lg bg-primary text-white text-xs font-bold uppercase tracking-widest">Search</button>
+              </form>
               <NavLink to="/" end className={({ isActive }) => isActive ? activeClass : inactiveClass}>
                 <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>grid_view</span>
                 <span className="font-headline uppercase tracking-widest text-[10px]">Home</span>
