@@ -91,7 +91,7 @@ export const createCommunity = async (name, description, image_url = null) => {
     });
 };
 
-export const updateUserAvatar = async (avatar_url) => {
+export const updateUserAvatar = async (avatar_url = null) => {
     const headers = await getAuthHeaders();
     return apiRequest('user/avatar', {
         method: 'POST',

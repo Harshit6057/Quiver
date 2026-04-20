@@ -105,6 +105,19 @@ app.get('/api/user/profile/:username', async (req, res) => {
   // Get joined clusters
   const { count: clusterCount } = await supabase.from('community_members').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
 
+  const { data: joinedCommunityRows, error: joinedError } = await supabase
+    .from('community_members')
+    .select('communities(id, name, description, image_url)')
+    .eq('user_id', user.id);
+
+  if (joinedError) {
+    return res.status(500).json({ success: false, error: joinedError.message });
+  }
+
+  const joinedCommunities = (joinedCommunityRows || [])
+    .map((row) => row.communities)
+    .filter(Boolean);
+
   // Get recent posts
   const { data: recentPosts } = await supabase
     .from('posts')
@@ -119,6 +132,7 @@ app.get('/api/user/profile/:username', async (req, res) => {
       ...user,
       postCount: postCount || 0,
       clusterCount: clusterCount || 0,
+      joinedCommunities,
       recentPosts: recentPosts || []
     }
   });
@@ -150,8 +164,8 @@ app.post('/api/community/create', authenticate, async (req, res) => {
 
 app.post('/api/user/avatar', authenticate, async (req, res) => {
   const { avatar_url } = req.body;
-  if (!avatar_url) {
-    return res.status(400).json({ success: false, error: 'avatar_url is required' });
+  if (avatar_url !== null && typeof avatar_url !== 'string') {
+    return res.status(400).json({ success: false, error: 'avatar_url must be a string or null' });
   }
 
   const userClient = getAuthClient(req.headers.authorization);
@@ -173,16 +187,25 @@ app.post('/api/community/photo', authenticate, async (req, res) => {
   }
 
   const userClient = getAuthClient(req.headers.authorization);
+
+  const { data: ownedCommunity, error: ownershipError } = await userClient
+    .from('communities')
+    .select('id')
+    .eq('id', community_id)
+    .eq('owner_id', req.user.id)
+    .maybeSingle();
+
+  if (ownershipError) return res.status(500).json({ success: false, error: ownershipError.message });
+  if (!ownedCommunity) return res.status(403).json({ success: false, error: 'Only the owner can update community photo' });
+
   const { data, error } = await userClient
     .from('communities')
     .update({ image_url })
     .eq('id', community_id)
-    .eq('owner_id', req.user.id)
     .select()
     .single();
 
   if (error) return res.status(500).json({ success: false, error: error.message });
-  if (!data) return res.status(403).json({ success: false, error: 'Only the owner can update community photo' });
   res.json({ success: true, data });
 });
 

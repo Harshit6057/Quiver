@@ -9,7 +9,9 @@ const UserProfile = ({ user, onUserUpdated }) => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [removingPhoto, setRemovingPhoto] = useState(false);
   const avatarInputRef = useRef(null);
+  const connectedClustersRef = useRef(null);
 
   const loadProfile = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -84,6 +86,27 @@ const UserProfile = ({ user, onUserUpdated }) => {
     }
   };
 
+  const handleAvatarRemove = async () => {
+    if (user?.id !== profile?.id) return;
+    setRemovingPhoto(true);
+    try {
+      const updateRes = await updateUserAvatar(null);
+      if (!updateRes?.success) {
+        alert(updateRes?.error || 'Failed to remove profile photo');
+        return;
+      }
+
+      setProfile((prev) => ({ ...prev, ...updateRes.data, avatar_url: null }));
+      onUserUpdated?.(updateRes.data);
+    } finally {
+      setRemovingPhoto(false);
+    }
+  };
+
+  const handleOpenClusters = () => {
+    connectedClustersRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -114,13 +137,23 @@ const UserProfile = ({ user, onUserUpdated }) => {
               src={profile.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${profile.username}`} 
             />
             {user?.id === profile.id && (
-              <button
-                type="button"
-                onClick={() => avatarInputRef.current?.click()}
-                className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-background/90 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white"
-              >
-                {uploadingPhoto ? 'Uploading...' : 'Change Photo'}
-              </button>
+              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="px-3 py-1 rounded-full bg-background/90 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white"
+                >
+                  {uploadingPhoto ? 'Uploading...' : 'Change'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAvatarRemove}
+                  disabled={removingPhoto}
+                  className="px-3 py-1 rounded-full bg-background/90 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-slate-200 hover:text-white disabled:opacity-60"
+                >
+                  {removingPhoto ? 'Removing...' : 'Remove'}
+                </button>
+              </div>
             )}
             <input
               ref={avatarInputRef}
@@ -139,10 +172,10 @@ const UserProfile = ({ user, onUserUpdated }) => {
                 <span className="text-2xl sm:text-3xl lg:text-[2rem] font-bold font-headline text-primary">{profile.postCount}</span>
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Transmissions</span>
               </div>
-              <div className="flex flex-col">
+              <button type="button" onClick={handleOpenClusters} className="flex flex-col text-left hover:opacity-90 transition-opacity">
                 <span className="text-2xl sm:text-3xl lg:text-[2rem] font-bold font-headline text-secondary">{profile.clusterCount}</span>
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Connected Clusters</span>
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -171,6 +204,33 @@ const UserProfile = ({ user, onUserUpdated }) => {
         
         {/* Recent Posts Feed */}
         <div className="lg:col-span-8 flex flex-col gap-8">
+          <div ref={connectedClustersRef} className="glass-panel rounded-2xl p-5 sm:p-8 border border-white/5">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-headline text-lg sm:text-xl font-black tracking-tight text-white uppercase">Connected Clusters</h3>
+              <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">{profile.joinedCommunities?.length || 0} total</span>
+            </div>
+
+            {!profile.joinedCommunities || profile.joinedCommunities.length === 0 ? (
+              <p className="text-slate-500 text-sm">No connected clusters yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {profile.joinedCommunities.map((community) => (
+                  <Link key={community.id} to={`/c/${community.name}`} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-3 hover:border-primary/40 transition-all">
+                    <img
+                      src={community.image_url || `https://api.dicebear.com/7.x/shapes/svg?seed=${community.name}`}
+                      alt={community.name}
+                      className="h-10 w-10 rounded-lg object-cover border border-white/10"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white truncate">c/{community.name}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-slate-500 truncate">Connected</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-between items-center px-2">
             <h3 className="font-headline text-2xl font-black tracking-tight text-white uppercase italic">Latest Fragments</h3>
             <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Temporal Stream</span>
