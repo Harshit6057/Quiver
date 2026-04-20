@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchProfile } from '../api';
 import PostMediaRenderer from '../components/PostMediaRenderer';
@@ -7,26 +7,54 @@ const UserProfile = () => {
   const { username } = useParams();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const loadProfile = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    try {
+      const res = await fetchProfile(username);
+      if (res.success) {
+        setProfile(res.data);
+      } else {
+        setProfile(null);
+      }
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+      setProfile(null);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  }, [username]);
 
   useEffect(() => {
-    const loadProfile = async () => {
-      setLoading(true);
-      try {
-        const res = await fetchProfile(username);
-        if (res.success) {
-          setProfile(res.data);
-        } else {
-          setProfile(null);
-        }
-      } catch (error) {
-        console.error("Failed to load profile:", error);
-        setProfile(null);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadProfile();
-  }, [username]);
+  }, [loadProfile]);
+
+  const handleSynchronize = async () => {
+    setSyncing(true);
+    await loadProfile(false);
+    setSyncing(false);
+  };
+
+  const handleShare = async () => {
+    const profileUrl = `${window.location.origin}/u/${profile?.username || username}`;
+    const payload = {
+      title: `${profile?.username || username} on Ethereal`,
+      text: 'Explore this Ethereal profile.',
+      url: profileUrl
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(payload);
+      } else {
+        await navigator.clipboard.writeText(profileUrl);
+        alert('Profile link copied to clipboard');
+      }
+    } catch (error) {
+      console.error('Share failed:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -50,7 +78,7 @@ const UserProfile = () => {
       {/* Profile Hero Section */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10 items-end mb-12 md:mb-16">
         <div className="lg:col-span-8 flex flex-col md:flex-row gap-5 md:gap-7 items-center md:items-end">
-          <div className="relative group">
+          <div className="relative group shrink-0">
             <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-125 group-hover:bg-primary/40 transition-all duration-700"></div>
             <img 
               className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-xl glass-card p-2 border-2 border-primary/40 object-cover" 
@@ -75,8 +103,19 @@ const UserProfile = () => {
           </div>
         </div>
         <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col justify-center lg:justify-end gap-3 z-10 relative pb-0 sm:pb-2">
-          <button className="px-6 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-[0_0_20px_rgba(221,183,255,0.3)] hover:shadow-[0_0_40px_rgba(221,183,255,0.5)] transition-all active:scale-95">Synchronize</button>
-          <button className="p-4 sm:p-5 glass-panel rounded-xl text-white hover:bg-white/10 transition-all border border-white/10 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={handleSynchronize}
+            disabled={syncing}
+            className="px-6 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-[0_0_20px_rgba(221,183,255,0.3)] hover:shadow-[0_0_40px_rgba(221,183,255,0.5)] transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {syncing ? 'Synchronizing...' : 'Synchronize'}
+          </button>
+          <button
+            type="button"
+            onClick={handleShare}
+            className="p-4 sm:p-5 glass-panel rounded-xl text-white hover:bg-white/10 transition-all border border-white/10 self-start sm:self-auto"
+          >
             <span className="material-symbols-outlined">share</span>
           </button>
         </div>

@@ -1,9 +1,16 @@
-import React from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 const Layout = ({ children, user, handleLogin }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/');
@@ -16,6 +23,14 @@ const Layout = ({ children, user, handleLogin }) => {
       {/* TopNavBar */}
       <nav className="fixed top-0 w-full z-50 bg-slate-900/80 backdrop-blur-xl flex justify-between items-center px-4 sm:px-6 lg:px-8 h-16 md:h-20 shadow-[0_0_40px_-15px_rgba(168,85,247,0.2)] bg-gradient-to-b from-white/5 to-transparent">
         <div className="flex items-center gap-4 sm:gap-8 min-w-0">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="md:hidden inline-flex items-center justify-center h-9 w-9 rounded-lg border border-white/15 text-slate-200 hover:text-white hover:bg-white/5 transition-all"
+            aria-label="Toggle menu"
+          >
+            <span className="material-symbols-outlined text-[20px]">menu</span>
+          </button>
           <Link to="/" className="text-xl sm:text-2xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-purple-600 font-headline whitespace-nowrap">Ethereal</Link>
           <div className="hidden md:flex items-center gap-6 font-headline tracking-tighter text-sm uppercase">
             <NavLink to="/explore" className={({ isActive }) => isActive ? "text-purple-300 border-b-2 border-purple-500 pb-1" : "text-slate-400 hover:text-slate-200 transition-all duration-300"}>Explore</NavLink>
@@ -37,11 +52,19 @@ const Layout = ({ children, user, handleLogin }) => {
                 </button>
             ) : (
                 <div className="flex items-center gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-lg border border-white/15 text-slate-200 hover:text-white hover:bg-white/5 transition-all"
+                    aria-label="Logout"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">logout</span>
+                  </button>
                   <button onClick={handleLogout} className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-full text-xs font-bold uppercase tracking-widest text-slate-300 border border-white/10 hover:text-white hover:bg-white/5 transition-all">
                     <span className="material-symbols-outlined text-sm">logout</span>
                     Logout
                   </button>
-                  <Link to={`/u/${user?.username}`} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-primary/20 overflow-hidden">
+                  <Link to={`/u/${user?.username}`} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-primary/20 overflow-hidden shrink-0">
                     <img src={user?.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=placeholder"} alt="User Avatar" className="w-full h-full object-cover" />
                   </Link>
                 </div>
@@ -49,6 +72,67 @@ const Layout = ({ children, user, handleLogin }) => {
           </div>
         </div>
       </nav>
+
+      {mobileMenuOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close menu overlay"
+            onClick={() => setMobileMenuOpen(false)}
+            className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[55]"
+          />
+          <aside className="md:hidden fixed top-16 left-0 w-[88vw] max-w-xs h-[calc(100vh-4rem)] z-[60] bg-slate-950/95 border-r border-white/10 backdrop-blur-xl flex flex-col">
+            <div className="px-5 pt-5 pb-4 border-b border-white/10">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-8 w-8 bg-gradient-to-br from-primary to-primary-container rounded-lg flex items-center justify-center">
+                  <span className="material-symbols-outlined text-on-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>terminal</span>
+                </div>
+                <span className="text-lg font-black text-white font-headline">Terminal</span>
+              </div>
+              <span className="font-headline uppercase tracking-widest text-[10px] text-slate-500">V 2.0.4</span>
+            </div>
+
+            <nav className="flex flex-col gap-1 px-2 py-4 flex-1 overflow-y-auto">
+              <NavLink to="/" end className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+                <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>grid_view</span>
+                <span className="font-headline uppercase tracking-widest text-[10px]">Home</span>
+              </NavLink>
+              <NavLink to="/trending" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+                <span className="material-symbols-outlined text-lg">trending_up</span>
+                <span className="font-headline uppercase tracking-widest text-[10px]">Trending</span>
+              </NavLink>
+              <NavLink to="/explore" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+                <span className="material-symbols-outlined text-lg">groups</span>
+                <span className="font-headline uppercase tracking-widest text-[10px]">Communities</span>
+              </NavLink>
+              <NavLink to="/bookmarks" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+                <span className="material-symbols-outlined text-lg">bookmark</span>
+                <span className="font-headline uppercase tracking-widest text-[10px]">Bookmarks</span>
+              </NavLink>
+              <NavLink to="/history" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+                <span className="material-symbols-outlined text-lg">history</span>
+                <span className="font-headline uppercase tracking-widest text-[10px]">History</span>
+              </NavLink>
+            </nav>
+
+            <div className="p-5 border-t border-white/10 space-y-3">
+              {user && (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-widest text-slate-200 border border-white/15 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">logout</span>
+                  Logout
+                </button>
+              )}
+              <button className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary text-xs font-bold uppercase tracking-widest hover:shadow-[0_0_20px_rgba(221,183,255,0.4)] transition-all">
+                Join Beta
+              </button>
+            </div>
+          </aside>
+        </>
+      )}
 
       {/* SideNavBar */}
       <aside className="h-screen w-64 fixed left-0 top-0 pt-24 hidden md:flex flex-col gap-2 bg-slate-950/40 backdrop-blur-2xl bg-gradient-to-r from-white/5 to-transparent border-none z-40">
