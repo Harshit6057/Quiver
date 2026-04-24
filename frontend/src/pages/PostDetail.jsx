@@ -1,18 +1,46 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { addComment, fetchCommentsByPostId, fetchPostById, fetchPostsByCommunityName, vote } from '../api';
 import PostMediaRenderer from '../components/PostMediaRenderer';
 
 // import { fetchPostById } from '../api';
 
-const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {}, onVoteCountChange }) => {
+const PostDetail = ({ user, bookmarkedPostIds = [], onToggleBookmark, voteCounts = {}, onVoteCountChange }) => {
+  const REPLIES_PAGE_SIZE = 3;
   const { id } = useParams();
   const [post, setPost] = useState(null);
   const [communityPosts, setCommunityPosts] = useState([]);
   const [relatedPosts, setRelatedPosts] = useState([]);
   const [comments, setComments] = useState([]);
+  const [commentVoteCounts, setCommentVoteCounts] = useState({});
   const [commentText, setCommentText] = useState('');
   const [postingComment, setPostingComment] = useState(false);
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replyingTo, setReplyingTo] = useState({});
+  const [postingReplyTo, setPostingReplyTo] = useState(null);
+  const [collapsedReplies, setCollapsedReplies] = useState({});
+  const [replyPages, setReplyPages] = useState({});
+
+  const buildCommentTree = (flatComments) => {
+    const byId = new Map();
+    const roots = [];
+
+    (flatComments || []).forEach((comment) => {
+      byId.set(comment.id, { ...comment, children: [] });
+    });
+
+    byId.forEach((comment) => {
+      if (comment.parent_comment_id && byId.has(comment.parent_comment_id)) {
+        byId.get(comment.parent_comment_id).children.push(comment);
+      } else {
+        roots.push(comment);
+      }
+    });
+
+    return roots;
+  };
+
+  const commentTree = useMemo(() => buildCommentTree(comments), [comments]);
 
   const handleVote = async (voteType = 1) => {
     if (!post?.id) return;
@@ -54,9 +82,13 @@ const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {},
     if (res?.success && res?.data) {
       const inserted = {
         ...res.data,
-        author: post.author
+        author: {
+          username: user?.username || post.author?.username || 'Unknown',
+          avatar_url: user?.avatar_url || post.author?.avatar_url || null
+        }
       };
       setComments(prev => [...prev, inserted]);
+      setCommentVoteCounts(prev => ({ ...prev, [inserted.id]: inserted.votes_count ?? 0 }));
       setCommentText('');
     } else {
       alert(res?.error || 'Unable to post insight right now');
@@ -89,7 +121,13 @@ const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {},
       if (postData?.id) {
         const commentsRes = await fetchCommentsByPostId(postData.id);
         if (commentsRes?.success) {
-          setComments(commentsRes.data || []);
+          const loadedComments = commentsRes.data || [];
+          setComments(loadedComments);
+          const counts = loadedComments.reduce((acc, comment) => {
+            acc[comment.id] = comment.votes_count ?? 0;
+            return acc;
+          }, {});
+          setCommentVoteCounts(counts);
         }
       }
 
@@ -113,6 +151,179 @@ const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {},
   const isBookmarked = post?.id ? bookmarkedPostIds.includes(post.id) : false;
 
   if (!post) return <div className="p-12 text-center text-white">Synthesizing...</div>;
+
+  const handleCommentVote = async (commentId, voteType) => {
+    if (!user) {
+      alert('Please sign in to vote on comments');
+      return;
+    }
+
+    const previousVotes = commentVoteCounts[commentId] ?? comments.find((c) => c.id === commentId)?.votes_count ?? 0;
+    const nextVotes = previousVotes + voteType;
+    setCommentVoteCounts((prev) => ({ ...prev, [commentId]: nextVotes }));
+
+    const res = await vote(voteType, null, commentId);
+    if (!res?.success) {
+      setCommentVoteCounts((prev) => ({ ...prev, [commentId]: previousVotes }));
+      alert(res?.error || 'Unable to register comment vote right now');
+      return;
+    }
+
+    if (typeof res.totalVotes === 'number') {
+      setCommentVoteCounts((prev) => ({ ...prev, [commentId]: res.totalVotes }));
+    }
+  };
+
+  const handleReplySubmit = async (parentCommentId) => {
+    const content = (replyDrafts[parentCommentId] || '').trim();
+    if (!content || !post?.id) return;
+    if (!user) {
+      alert('Please sign in to reply');
+      return;
+    }
+
+    setPostingReplyTo(parentCommentId);
+    const res = await addComment(post.id, content, parentCommentId);
+
+    if (res?.success && res?.data) {
+      const inserted = {
+        ...res.data,
+        author: {
+          username: user?.username || 'Unknown',
+          avatar_url: user?.avatar_url || null
+        }
+      };
+      setComments((prev) => [...prev, inserted]);
+      setCommentVoteCounts((prev) => ({ ...prev, [inserted.id]: inserted.votes_count ?? 0 }));
+      setReplyDrafts((prev) => ({ ...prev, [parentCommentId]: '' }));
+      setReplyingTo((prev) => ({ ...prev, [parentCommentId]: false }));
+    } else {
+      alert(res?.error || 'Unable to post reply right now');
+    }
+
+    setPostingReplyTo(null);
+  };
+
+  const renderCommentNode = (comment, depth = 0) => {
+    const voteCount = commentVoteCounts[comment.id] ?? comment.votes_count ?? 0;
+    const isReplying = Boolean(replyingTo[comment.id]);
+    const replyValue = replyDrafts[comment.id] || '';
+    const hasChildren = (comment.children?.length || 0) > 0;
+    const isCollapsed = Boolean(collapsedReplies[comment.id]);
+    const currentPage = replyPages[comment.id] || 1;
+    const maxVisibleReplies = currentPage * REPLIES_PAGE_SIZE;
+    const visibleChildren = comment.children?.slice(0, maxVisibleReplies) || [];
+    const hasMoreReplies = (comment.children?.length || 0) > maxVisibleReplies;
+    const isOwnComment = comment.author_id === user?.id || comment.author?.username === user?.username;
+
+    return (
+      <div className="group" key={comment.id} style={{ marginLeft: depth > 0 ? `${Math.min(depth * 18, 54)}px` : 0 }}>
+        <div className="bg-surface-container-high/40 glass-panel p-4 sm:p-6 rounded-xl transition-all hover:bg-surface-container-high/60 border border-white/5">
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex items-center gap-3">
+              <img
+                alt="User"
+                className="w-9 h-9 rounded-full object-cover border border-secondary/30"
+                src={comment.author?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=fallback'}
+              />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-white font-bold text-sm">{comment.author?.username || 'Unknown'}</span>
+                  {isOwnComment && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest bg-primary/20 border border-primary/30 text-primary">
+                      You
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-slate-500 block font-space-grotesk uppercase tracking-widest">
+                  {comment.created_at ? new Date(comment.created_at).toLocaleString() : 'Just now'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <p className="text-slate-300 text-sm leading-relaxed break-words">{comment.content}</p>
+
+          <div className="flex items-center gap-2 mt-4">
+            <button
+              type="button"
+              onClick={() => handleCommentVote(comment.id, 1)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-container-lowest border border-white/10 text-primary hover:bg-primary/20 transition-all"
+            >
+              <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>thumb_up</span>
+              <span className="text-xs font-bold text-white">{voteCount}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleCommentVote(comment.id, -1)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-container-lowest border border-white/10 text-error hover:bg-error/20 transition-all"
+            >
+              <span className="material-symbols-outlined text-base">thumb_down</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setReplyingTo((prev) => ({ ...prev, [comment.id]: !prev[comment.id] }))}
+              className="px-3 py-1.5 rounded-full bg-surface-container-lowest border border-white/10 text-slate-300 hover:text-white transition-all text-xs font-bold uppercase tracking-widest"
+            >
+              Reply
+            </button>
+            {hasChildren && (
+              <button
+                type="button"
+                onClick={() => setCollapsedReplies((prev) => ({ ...prev, [comment.id]: !prev[comment.id] }))}
+                className="px-3 py-1.5 rounded-full bg-surface-container-lowest border border-white/10 text-slate-300 hover:text-white transition-all text-xs font-bold uppercase tracking-widest"
+              >
+                {isCollapsed ? `Expand Replies (${comment.children.length})` : 'Collapse Replies'}
+              </button>
+            )}
+          </div>
+
+          {isReplying && (
+            <div className="mt-4 rounded-lg border border-white/10 bg-surface-container-lowest p-3">
+              <textarea
+                value={replyValue}
+                onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [comment.id]: e.target.value }))}
+                className="w-full bg-transparent border-none rounded-lg p-0 text-on-surface focus:ring-0 outline-none resize-none text-sm"
+                placeholder="Write your reply..."
+                rows={2}
+              />
+              <div className="flex justify-end mt-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReplyingTo((prev) => ({ ...prev, [comment.id]: false }))}
+                  className="px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReplySubmit(comment.id)}
+                  disabled={postingReplyTo === comment.id || !replyValue.trim()}
+                  className="px-4 py-1.5 rounded-full bg-secondary text-on-secondary-container text-xs font-bold disabled:opacity-60"
+                >
+                  {postingReplyTo === comment.id ? 'Posting...' : 'Reply'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {hasChildren && !isCollapsed && (
+          <div className="mt-3 space-y-3">
+            {visibleChildren.map((child) => renderCommentNode(child, depth + 1))}
+            {hasMoreReplies && (
+              <button
+                type="button"
+                onClick={() => setReplyPages((prev) => ({ ...prev, [comment.id]: (prev[comment.id] || 1) + 1 }))}
+                className="text-xs font-bold uppercase tracking-widest text-secondary hover:text-white transition-colors px-3 py-2"
+              >
+                Show More Replies
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-3 sm:px-4 flex gap-8 lg:gap-12 relative flex-col lg:flex-row overflow-x-hidden">
@@ -222,28 +433,7 @@ const PostDetail = ({ bookmarkedPostIds = [], onToggleBookmark, voteCounts = {},
                 No insights yet. Be the first to add one.
               </div>
             ) : (
-              comments.map((comment) => (
-                <div className="group" key={comment.id}>
-                  <div className="bg-surface-container-high/40 glass-panel p-6 rounded-xl transition-all hover:bg-surface-container-high/60">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          alt="User"
-                          className="w-10 h-10 rounded-full object-cover border border-secondary/30"
-                          src={comment.author?.avatar_url || 'https://api.dicebear.com/7.x/identicon/svg?seed=fallback'}
-                        />
-                        <div>
-                          <span className="text-white font-bold text-sm">{comment.author?.username || 'Unknown'}</span>
-                          <span className="text-[10px] text-slate-500 block font-space-grotesk uppercase tracking-widest">
-                            {comment.created_at ? new Date(comment.created_at).toLocaleString() : 'Just now'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-slate-300 text-sm leading-relaxed">{comment.content}</p>
-                  </div>
-                </div>
-              ))
+              commentTree.map((comment) => renderCommentNode(comment))
             )}
           </div>
         </section>
