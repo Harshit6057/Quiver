@@ -16,6 +16,47 @@ const upload = multer({
   }
 });
 
+const cacheStore = new Map();
+
+const getCache = (key) => {
+  const cached = cacheStore.get(key);
+  if (!cached) return null;
+
+  if (Date.now() >= cached.expiresAt) {
+    cacheStore.delete(key);
+    return null;
+  }
+
+  return cached.value;
+};
+
+const setCache = (key, value, ttlMs) => {
+  cacheStore.set(key, {
+    value,
+    expiresAt: Date.now() + ttlMs
+  });
+};
+
+const rememberCache = async (key, ttlMs, producer) => {
+  const cached = getCache(key);
+  if (cached) return cached;
+
+  const value = await producer();
+  setCache(key, value, ttlMs);
+  return value;
+};
+
+const invalidateCache = (prefixes = []) => {
+  if (!Array.isArray(prefixes) || prefixes.length === 0) return;
+  const keys = Array.from(cacheStore.keys());
+
+  keys.forEach((key) => {
+    if (prefixes.some((prefix) => key.startsWith(prefix))) {
+      cacheStore.delete(key);
+    }
+  });
+};
+
 const withPostVoteCounts = async (posts) => {
   if (!posts || posts.length === 0) return [];
 
@@ -85,6 +126,12 @@ app.get('/api/user', authenticate, async (req, res) => {
 
 app.get('/api/user/profile/:username', async (req, res) => {
   const requestedUsername = String(req.params.username || '').trim();
+  const profileCacheKey = `profile:${requestedUsername.toLowerCase()}`;
+  const cachedProfile = getCache(profileCacheKey);
+  if (cachedProfile) {
+    return res.json(cachedProfile);
+  }
+
   console.log(`[Profile] Fetching for: ${requestedUsername}`);
   const { data: user, error: uError } = await supabase
     .from('users')
@@ -159,7 +206,7 @@ app.get('/api/user/profile/:username', async (req, res) => {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      return res.json({
+      const payload = {
         success: true,
         data: {
           ...user,
@@ -168,7 +215,9 @@ app.get('/api/user/profile/:username', async (req, res) => {
           joinedCommunities,
           recentPosts: recentPosts || []
         }
-      });
+      };
+      setCache(profileCacheKey, payload, 30 * 1000);
+      return res.json(payload);
     }
     console.error('Profile fetch error:', uError);
     return res.status(500).json({ success: false, error: uError.message });
@@ -213,7 +262,7 @@ app.get('/api/user/profile/:username', async (req, res) => {
     .order('created_at', { ascending: false })
     .limit(5);
 
-  res.json({
+  const payload = {
     success: true,
     data: {
       ...user,
@@ -222,7 +271,10 @@ app.get('/api/user/profile/:username', async (req, res) => {
       joinedCommunities,
       recentPosts: recentPosts || []
     }
-  });
+  };
+
+  setCache(profileCacheKey, payload, 30 * 1000);
+  res.json(payload);
 });
 
 /* --- COMMUNITY --- */
@@ -246,6 +298,8 @@ app.post('/api/community/create', authenticate, async (req, res) => {
 
   if (mError) console.error("Failed to add owner as member:", mError);
 
+  invalidateCache(['community:', 'posts:', 'stats', 'search:', 'profile:']);
+
   res.json({ success: true, data: community });
 });
 
@@ -264,6 +318,7 @@ app.post('/api/user/avatar', authenticate, async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ success: false, error: error.message });
+  invalidateCache(['profile:']);
   res.json({ success: true, data });
 });
 
@@ -293,6 +348,7 @@ app.post('/api/community/photo', authenticate, async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ success: false, error: error.message });
+  invalidateCache(['community:', 'profile:', 'search:']);
   res.json({ success: true, data });
 });
 
@@ -305,6 +361,7 @@ app.post('/api/community/join', authenticate, async (req, res) => {
     .select();
 
   if (error) return res.status(500).json({ success: false, error: error.message });
+  invalidateCache(['community:', 'profile:']);
   res.json({ success: true, data });
 });
 
@@ -318,10 +375,15 @@ app.post('/api/community/leave', authenticate, async (req, res) => {
     .eq('user_id', req.user.id);
 
   if (error) return res.status(500).json({ success: false, error: error.message });
+  invalidateCache(['community:', 'profile:']);
   res.json({ success: true, data: 'Left community' });
 });
 
 app.get('/api/community/all', async (req, res) => {
+  const cacheKey = 'community:all';
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
   const { data, error } = await supabase
     .from('communities')
     .select('*, community_members!inner(count)')
@@ -338,15 +400,23 @@ app.get('/api/community/all', async (req, res) => {
     return { ...c, member_count: count || 0 };
   }));
 
-  res.json({ success: true, data: enriched });
+  const payload = { success: true, data: enriched };
+  setCache(cacheKey, payload, 60 * 1000);
+  res.json(payload);
 });
 
 app.get('/api/community/:id', async (req, res) => {
+  const cacheKey = `community:id:${req.params.id}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
   const { data: community, error } = await supabase.from('communities').select('*').eq('id', req.params.id).single();
   if (error) return res.status(500).json({ success: false, error: error.message });
 
   const { count } = await supabase.from('community_members').select('*', { count: 'exact', head: true }).eq('community_id', community.id);
-  res.json({ success: true, data: { ...community, member_count: count || 0 } });
+  const payload = { success: true, data: { ...community, member_count: count || 0 } };
+  setCache(cacheKey, payload, 60 * 1000);
+  res.json(payload);
 });
 
 app.get('/api/community/name/:name', async (req, res) => {
@@ -455,10 +525,15 @@ app.post('/api/post/create', authenticate, async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ success: false, error: error.message });
+  invalidateCache(['posts:', 'post:', 'profile:', 'search:', 'community:']);
   res.json({ success: true, data });
 });
 
 app.get('/api/post/:id', async (req, res) => {
+  const cacheKey = `post:${req.params.id}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
   const { data, error } = await supabase
     .from('posts')
     .select('*, author:users(username, avatar_url), community:communities(name)')
@@ -467,7 +542,9 @@ app.get('/api/post/:id', async (req, res) => {
 
   if (error) return res.status(500).json({ success: false, error: error.message });
   const [postWithVotes] = await withPostVoteCounts([data]);
-  res.json({ success: true, data: postWithVotes });
+  const payload = { success: true, data: postWithVotes };
+  setCache(cacheKey, payload, 20 * 1000);
+  res.json(payload);
 });
 
 app.get('/api/posts/feed', authenticate, async (req, res) => {
@@ -488,6 +565,10 @@ app.get('/api/posts/feed', authenticate, async (req, res) => {
 });
 
 app.get('/api/posts/trending', async (req, res) => {
+  const cacheKey = 'posts:trending';
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -501,10 +582,16 @@ app.get('/api/posts/trending', async (req, res) => {
   if (error) return res.status(500).json({ success: false, error: error.message });
   const postsWithVotes = await withPostVoteCounts(data || []);
   postsWithVotes.sort((a, b) => (b.votes_count || 0) - (a.votes_count || 0));
-  res.json({ success: true, data: postsWithVotes });
+  const payload = { success: true, data: postsWithVotes };
+  setCache(cacheKey, payload, 20 * 1000);
+  res.json(payload);
 });
 
 app.get('/api/posts/community/:id', async (req, res) => {
+  const cacheKey = `posts:community:${req.params.id}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
   const { data, error } = await supabase
     .from('posts')
     .select('*, author:users(username, avatar_url)')
@@ -513,10 +600,16 @@ app.get('/api/posts/community/:id', async (req, res) => {
 
   if (error) return res.status(500).json({ success: false, error: error.message });
   const postsWithVotes = await withPostVoteCounts(data || []);
-  res.json({ success: true, data: postsWithVotes });
+  const payload = { success: true, data: postsWithVotes };
+  setCache(cacheKey, payload, 20 * 1000);
+  res.json(payload);
 });
 
 app.get('/api/posts/comm-name/:name', async (req, res) => {
+  const cacheKey = `posts:comm-name:${String(req.params.name || '').toLowerCase()}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
   const { data: community, error: cError } = await supabase.from('communities').select('id').eq('name', req.params.name).single();
   if (cError) return res.status(500).json({ success: false, error: cError.message });
 
@@ -528,7 +621,9 @@ app.get('/api/posts/comm-name/:name', async (req, res) => {
 
   if (error) return res.status(500).json({ success: false, error: error.message });
   const postsWithVotes = await withPostVoteCounts(data || []);
-  res.json({ success: true, data: postsWithVotes });
+  const payload = { success: true, data: postsWithVotes };
+  setCache(cacheKey, payload, 20 * 1000);
+  res.json(payload);
 });
 
 
@@ -603,10 +698,15 @@ app.post('/api/comment/add', authenticate, async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ success: false, error: error.message });
+  invalidateCache(['comments:post:', 'post:', 'posts:', 'profile:']);
   res.json({ success: true, data });
 });
 
 app.get('/api/comments/:postId', async (req, res) => {
+  const cacheKey = `comments:post:${req.params.postId}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
   const { data, error } = await supabase
     .from('comments')
     .select('*, author:users(username, avatar_url)')
@@ -614,7 +714,9 @@ app.get('/api/comments/:postId', async (req, res) => {
     .order('created_at', { ascending: true }); // Need recursion on frontend for nested structure usually
 
   if (error) return res.status(500).json({ success: false, error: error.message });
-  res.json({ success: true, data });
+  const payload = { success: true, data };
+  setCache(cacheKey, payload, 10 * 1000);
+  res.json(payload);
 });
 
 /* --- VOTES --- */
@@ -668,22 +770,30 @@ app.post('/api/vote', authenticate, async (req, res) => {
     totalVotes = (commentVotes || []).reduce((sum, row) => sum + (row.vote_type || 0), 0);
   }
 
+  invalidateCache(['post:', 'posts:', 'comments:post:', 'profile:', 'search:']);
   res.json({ success: true, data, totalVotes });
 });
 
 /* --- SEARCH --- */
 app.get('/api/stats', async (req, res) => {
+  const cacheKey = 'stats';
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
   const { count: totalClusters } = await supabase.from('communities').select('*', { count: 'exact', head: true });
   const { count: totalNodes } = await supabase.from('users').select('*', { count: 'exact', head: true });
 
-  res.json({
+  const payload = {
     success: true,
     data: {
       totalClusters: totalClusters || 0,
       totalNodes: (totalNodes || 0) + 120, // offset for 'premium' feel or just use real count
       latency: '0.04s'
     }
-  });
+  };
+
+  setCache(cacheKey, payload, 30 * 1000);
+  res.json(payload);
 });
 
 app.get('/api/search', async (req, res) => {
@@ -693,6 +803,10 @@ app.get('/api/search', async (req, res) => {
   if (!query) {
     return res.json({ success: true, data: { posts: [], communities: [], users: [] } });
   }
+
+  const cacheKey = `search:${query.toLowerCase()}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
 
   const [{ data: posts, error: postsError }, { data: communities, error: communitiesError }, { data: users, error: usersError }] = await Promise.all([
     supabase
@@ -714,7 +828,9 @@ app.get('/api/search', async (req, res) => {
   if (usersError) return res.status(500).json({ success: false, error: usersError.message });
 
   const postsWithVotes = await withPostVoteCounts(posts || []);
-  res.json({ success: true, data: { posts: postsWithVotes, communities: communities || [], users: users || [] } });
+  const payload = { success: true, data: { posts: postsWithVotes, communities: communities || [], users: users || [] } };
+  setCache(cacheKey, payload, 15 * 1000);
+  res.json(payload);
 });
 
 const PORT = process.env.PORT || 5000;
