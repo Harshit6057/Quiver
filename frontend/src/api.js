@@ -78,7 +78,8 @@ export const fetchCurrentUser = async () => {
 };
 
 export const fetchProfile = async (username) => {
-    return apiRequest(`user/profile/${username}`);
+    const headers = await getAuthHeaders();
+    return apiRequest(`user/profile/${encodeURIComponent(username)}`, { headers });
 };
 
 // -- COMMUNITY --

@@ -18,6 +18,9 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_SITE_URL: ${VITE_SITE_URL}
     container_name: quiver-frontend
     depends_on:
       - backend

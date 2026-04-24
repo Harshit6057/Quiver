@@ -84,16 +84,91 @@ app.get('/api/user', authenticate, async (req, res) => {
 });
 
 app.get('/api/user/profile/:username', async (req, res) => {
-  console.log(`[Profile] Fetching for: ${req.params.username}`);
+  const requestedUsername = String(req.params.username || '').trim();
+  console.log(`[Profile] Fetching for: ${requestedUsername}`);
   const { data: user, error: uError } = await supabase
     .from('users')
     .select('*')
-    .eq('username', req.params.username)
+    .ilike('username', requestedUsername)
     .single();
+
+  const resolveOwnProfileFallback = async () => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return null;
+
+    const userClient = getAuthClient(authHeader);
+    const { data: { user: authUser } } = await supabase.auth.getUser(authHeader.split(' ')[1]);
+    if (!authUser) return null;
+
+    const { data: dbUser, error: dbUserError } = await userClient
+      .from('users')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+
+    if (dbUserError || !dbUser) return null;
+    if (String(dbUser.username || '').trim().toLowerCase() !== requestedUsername.toLowerCase()) return null;
+
+    return dbUser;
+  };
 
   if (uError) {
     if (uError.code === 'PGRST116') {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      const fallbackUser = await resolveOwnProfileFallback();
+      if (!fallbackUser) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+      }
+
+      const user = fallbackUser;
+
+      // Get total posts
+      const { count: postCount } = await supabase.from('posts').select('*', { count: 'exact', head: true }).eq('author_id', user.id);
+
+      // Get joined clusters
+      const { count: clusterCount } = await supabase.from('community_members').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
+
+        const { data: joinedCommunityRows, error: joinedError } = await supabase
+          .from('community_members')
+          .select('community_id')
+          .eq('user_id', user.id);
+
+      if (joinedError) {
+        return res.status(500).json({ success: false, error: joinedError.message });
+      }
+
+        const joinedCommunityIds = (joinedCommunityRows || []).map((row) => row.community_id).filter(Boolean);
+
+        let joinedCommunities = [];
+        if (joinedCommunityIds.length > 0) {
+          const { data: joinedCommunitiesData, error: joinedCommunitiesError } = await supabase
+            .from('communities')
+            .select('id, name, description')
+            .in('id', joinedCommunityIds);
+
+          if (joinedCommunitiesError) {
+            return res.status(500).json({ success: false, error: joinedCommunitiesError.message });
+          }
+
+          joinedCommunities = joinedCommunitiesData || [];
+        }
+
+      const { data: recentPosts } = await supabase
+        .from('posts')
+        .select('*, author:users(username, avatar_url), community:communities(name)')
+        .eq('author_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      return res.json({
+        success: true,
+        data: {
+          ...user,
+          postCount: postCount || 0,
+          clusterCount: clusterCount || 0,
+          joinedCommunities,
+          recentPosts: recentPosts || []
+        }
+      });
     }
     console.error('Profile fetch error:', uError);
     return res.status(500).json({ success: false, error: uError.message });
@@ -107,16 +182,28 @@ app.get('/api/user/profile/:username', async (req, res) => {
 
   const { data: joinedCommunityRows, error: joinedError } = await supabase
     .from('community_members')
-    .select('communities(id, name, description, image_url)')
+    .select('community_id')
     .eq('user_id', user.id);
 
   if (joinedError) {
     return res.status(500).json({ success: false, error: joinedError.message });
   }
 
-  const joinedCommunities = (joinedCommunityRows || [])
-    .map((row) => row.communities)
-    .filter(Boolean);
+  const joinedCommunityIds = (joinedCommunityRows || []).map((row) => row.community_id).filter(Boolean);
+
+  let joinedCommunities = [];
+  if (joinedCommunityIds.length > 0) {
+    const { data: joinedCommunitiesData, error: joinedCommunitiesError } = await supabase
+      .from('communities')
+      .select('id, name, description')
+      .in('id', joinedCommunityIds);
+
+    if (joinedCommunitiesError) {
+      return res.status(500).json({ success: false, error: joinedCommunitiesError.message });
+    }
+
+    joinedCommunities = joinedCommunitiesData || [];
+  }
 
   // Get recent posts
   const { data: recentPosts } = await supabase
