@@ -42,8 +42,8 @@ const Layout = ({ children, user, handleLogin }) => {
           <Link to="/" className="text-xl sm:text-2xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-purple-600 font-headline whitespace-nowrap">Ethereal</Link>
           <div className="hidden md:flex items-center gap-6 font-headline tracking-tighter text-sm uppercase">
             <NavLink to="/explore" className={({ isActive }) => isActive ? "text-purple-300 border-b-2 border-purple-500 pb-1" : "text-slate-400 hover:text-slate-200 transition-all duration-300"}>Explore</NavLink>
-            <Link to="/" className="text-slate-400 hover:text-slate-200 transition-all duration-300">Activity</Link>
-            <Link to="/" className="text-slate-400 hover:text-slate-200 transition-all duration-300">Vault</Link>
+            <NavLink to="/connect" className={({ isActive }) => isActive ? "text-purple-300 border-b-2 border-purple-500 pb-1" : "text-slate-400 hover:text-slate-200 transition-all duration-300"}>Connect</NavLink>
+            <NavLink to="/messages" className={({ isActive }) => isActive ? "text-purple-300 border-b-2 border-purple-500 pb-1" : "text-slate-400 hover:text-slate-200 transition-all duration-300"}>Messages</NavLink>
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-4 md:gap-6">
@@ -60,7 +60,7 @@ const Layout = ({ children, user, handleLogin }) => {
           </form>
           <div className="flex items-center gap-4">
             <Link to="/create-community" className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-4 sm:px-6 py-2 rounded-full font-headline font-bold text-xs sm:text-sm hover:opacity-90 active:scale-95 transition-all">Create</Link>
-            <button className="material-symbols-outlined text-slate-400 hover:text-white transition-colors hidden sm:inline-flex">notifications</button>
+            <Link to="/notifications" className="material-symbols-outlined text-slate-400 hover:text-white transition-colors hidden sm:inline-flex">notifications</Link>
             {!user ? (
                 <button onClick={handleLogin} className="bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold px-6 py-2 rounded-full active:scale-95 transition-all duration-300 text-sm shadow-[0_0_20px_-5px_rgba(221,183,255,0.4)]">
                     Sign In
@@ -136,6 +136,18 @@ const Layout = ({ children, user, handleLogin }) => {
                 <span className="material-symbols-outlined text-lg">bookmark</span>
                 <span className="font-headline uppercase tracking-widest text-[10px]">Bookmarks</span>
               </NavLink>
+              <NavLink to="/connect" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+                <span className="material-symbols-outlined text-lg">person_add</span>
+                <span className="font-headline uppercase tracking-widest text-[10px]">Connect</span>
+              </NavLink>
+              <NavLink to="/messages" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+                <span className="material-symbols-outlined text-lg">chat</span>
+                <span className="font-headline uppercase tracking-widest text-[10px]">Messages</span>
+              </NavLink>
+              <NavLink to="/notifications" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+                <span className="material-symbols-outlined text-lg">notifications</span>
+                <span className="font-headline uppercase tracking-widest text-[10px]">Notifications</span>
+              </NavLink>
               <NavLink to="/history" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
                 <span className="material-symbols-outlined text-lg">history</span>
                 <span className="font-headline uppercase tracking-widest text-[10px]">History</span>
@@ -162,7 +174,7 @@ const Layout = ({ children, user, handleLogin }) => {
       )}
 
       {/* SideNavBar */}
-      <aside className="h-screen w-64 fixed left-0 top-0 pt-24 hidden md:flex flex-col gap-2 bg-slate-950/40 backdrop-blur-2xl bg-gradient-to-r from-white/5 to-transparent border-none z-40">
+      <aside className="h-screen w-64 fixed left-0 top-0 pt-24 hidden md:flex flex-col gap-2 bg-slate-950/40 backdrop-blur-2xl bg-gradient-to-r from-white/5 to-transparent border-none z-40 overflow-y-auto">
         <div className="px-6 mb-8">
           <div className="flex items-center gap-3 mb-1">
             <div className="h-8 w-8 bg-gradient-to-br from-primary to-primary-container rounded-lg flex items-center justify-center">
@@ -171,6 +183,14 @@ const Layout = ({ children, user, handleLogin }) => {
             <span className="text-lg font-black text-white font-headline">Terminal</span>
           </div>
           <span className="font-headline uppercase tracking-widest text-[10px] text-slate-500">V 2.0.4</span>
+        </div>
+        <div className="mx-4 mb-4 rounded-xl border border-white/10 bg-white/5 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-3">Attributes</p>
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between"><span className="text-slate-500">Username</span><span className="text-slate-200 truncate max-w-[120px]">{user?.username || 'Guest'}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Tier</span><span className="text-slate-200">{user ? 'Member' : 'Visitor'}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Privacy</span><span className="text-slate-200">{user?.is_private ? 'Private' : 'Public'}</span></div>
+          </div>
         </div>
         <nav className="flex flex-col gap-1 flex-1">
           <NavLink to="/" end className={({ isActive }) => isActive ? activeClass : inactiveClass}>
@@ -188,6 +208,18 @@ const Layout = ({ children, user, handleLogin }) => {
           <NavLink to="/bookmarks" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
             <span className="material-symbols-outlined text-lg">bookmark</span>
             <span className="font-headline uppercase tracking-widest text-[10px]">Bookmarks</span>
+          </NavLink>
+          <NavLink to="/connect" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+            <span className="material-symbols-outlined text-lg">person_add</span>
+            <span className="font-headline uppercase tracking-widest text-[10px]">Connect</span>
+          </NavLink>
+          <NavLink to="/messages" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+            <span className="material-symbols-outlined text-lg">chat</span>
+            <span className="font-headline uppercase tracking-widest text-[10px]">Messages</span>
+          </NavLink>
+          <NavLink to="/notifications" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
+            <span className="material-symbols-outlined text-lg">notifications</span>
+            <span className="font-headline uppercase tracking-widest text-[10px]">Notifications</span>
           </NavLink>
           <NavLink to="/history" className={({ isActive }) => isActive ? activeClass : inactiveClass}>
             <span className="material-symbols-outlined text-lg">history</span>
@@ -232,7 +264,8 @@ const Layout = ({ children, user, handleLogin }) => {
           <span className="material-symbols-outlined text-on-primary">add</span>
         </button>
         <NavLink to="/explore" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>groups</NavLink>
-        <NavLink to="/bookmarks" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>bookmark</NavLink>
+        <NavLink to="/connect" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>person_add</NavLink>
+        <NavLink to="/notifications" className={({ isActive }) => isActive ? "material-symbols-outlined text-purple-300" : "material-symbols-outlined text-slate-400"}>notifications</NavLink>
       </nav>
     </div>
   );

@@ -16,6 +16,9 @@ import Bookmarks from './pages/Bookmarks';
 import Trending from './pages/Trending';
 import History from './pages/History';
 import SearchResults from './pages/SearchResults';
+import Connect from './pages/Connect';
+import Messages from './pages/Messages';
+import Notifications from './pages/Notifications';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -180,6 +183,9 @@ function App() {
         <Route path="/history" element={<History user={user} bookmarks={bookmarks} />} />
         <Route path="/search" element={<SearchResults user={user} />} />
         <Route path="/trending" element={<Trending />} />
+        <Route path="/connect" element={<Connect user={user} onUserUpdated={handleUserUpdated} />} />
+        <Route path="/messages" element={<Messages user={user} />} />
+        <Route path="/notifications" element={<Notifications user={user} />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
       </Routes>

@@ -57,6 +57,117 @@ const invalidateCache = (prefixes = []) => {
   });
 };
 
+const createNotification = async ({ userClient, recipientId, actorId, type, payload = {} }) => {
+  if (!recipientId || !actorId || recipientId === actorId) return;
+
+  const typeToPreferenceKey = {
+    follow: 'follows_enabled',
+    follow_request: 'follow_requests_enabled',
+    follow_request_accepted: 'follow_requests_enabled',
+    follow_request_rejected: 'follow_requests_enabled',
+    message: 'messages_enabled'
+  };
+
+  const prefKey = typeToPreferenceKey[type];
+  if (prefKey) {
+    const { data: preference, error: prefError } = await supabase
+      .from('notification_preferences')
+      .select(prefKey)
+      .eq('user_id', recipientId)
+      .maybeSingle();
+
+    if (!prefError && preference && preference[prefKey] === false) {
+      return;
+    }
+  }
+
+  const { error } = await userClient
+    .from('notifications')
+    .insert([{ recipient_id: recipientId, actor_id: actorId, type, payload }]);
+
+  if (error) {
+    console.error('Failed to create notification:', error.message);
+  }
+};
+
+const ensureConversationParticipant = async (userClient, conversationId, userId) => {
+  const { data, error } = await userClient
+    .from('conversation_participants')
+    .select('id')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error };
+  }
+
+  if (!data) {
+    return { ok: false, unauthorized: true };
+  }
+
+  return { ok: true };
+};
+
+const asBoolean = (value, fallback = false) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(v)) return true;
+    if (['false', '0', 'no', 'off'].includes(v)) return false;
+  }
+  return fallback;
+};
+
+const isMissingTableError = (error) => {
+  if (!error) return false;
+  const code = String(error.code || '').toLowerCase();
+  const message = String(error.message || '').toLowerCase();
+  const details = String(error.details || '').toLowerCase();
+  return code === '42p01' || message.includes('does not exist') || details.includes('does not exist');
+};
+
+const rankSuggestedPeople = ({ users = [], followerCounts = {}, mutualCounts = {}, joinedCommunityOverlap = {} }) => {
+  return [...users]
+    .map((user) => {
+      const followerCount = Number(followerCounts[user.id] || 0);
+      const mutualCount = Number(mutualCounts[user.id] || 0);
+      const overlapCount = Number(joinedCommunityOverlap[user.id] || 0);
+
+      return {
+        ...user,
+        follower_count: followerCount,
+        mutual_count: mutualCount,
+        overlap_count: overlapCount,
+        score: mutualCount * 4 + overlapCount * 2 + followerCount * 0.2
+      };
+    })
+    .sort((a, b) => b.score - a.score || String(a.username || '').localeCompare(String(b.username || '')));
+};
+
+const getBlockedMap = async (userId) => {
+  const { data, error } = await supabase
+    .from('user_blocks')
+    .select('blocker_id, blocked_id')
+    .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      return { blockedByMe: new Set(), blockedMe: new Set(), error: null };
+    }
+    return { error };
+  }
+
+  const blockedByMe = new Set();
+  const blockedMe = new Set();
+  (data || []).forEach((row) => {
+    if (row.blocker_id === userId) blockedByMe.add(row.blocked_id);
+    if (row.blocked_id === userId) blockedMe.add(row.blocker_id);
+  });
+
+  return { blockedByMe, blockedMe, error: null };
+};
+
 const withPostVoteCounts = async (posts) => {
   if (!posts || posts.length === 0) return [];
 
@@ -110,7 +221,7 @@ app.get('/api/user', authenticate, async (req, res) => {
 
     const { data: newUser, error: createError } = await userClient
       .from('users')
-      .insert([{ id: req.user.id, username: randomUsername, avatar_url: avatarUrl, email: req.user.email }])
+      .insert([{ id: req.user.id, username: randomUsername, avatar_url: avatarUrl, email: req.user.email, is_private: false }])
       .select()
       .single();
 
@@ -553,15 +664,61 @@ app.get('/api/posts/feed', authenticate, async (req, res) => {
   const { data: joined } = await userClient.from('community_members').select('community_id').eq('user_id', req.user.id);
   const communityIds = joined?.map(j => j.community_id) || [];
 
-  const { data, error } = await userClient
+  const { data: followingRows } = await supabase
+    .from('follows')
+    .select('following_id')
+    .eq('follower_id', req.user.id);
+  const followingSet = new Set((followingRows || []).map((row) => row.following_id));
+
+  let postsQuery = userClient
     .from('posts')
     .select('*, author:users(username, avatar_url), community:communities(name)')
-    .in('community_id', communityIds)
     .order('created_at', { ascending: false });
 
+  if (communityIds.length > 0) {
+    postsQuery = postsQuery.in('community_id', communityIds);
+  } else {
+    postsQuery = postsQuery.limit(80);
+  }
+
+  const { data, error } = await postsQuery;
+
   if (error) return res.status(500).json({ success: false, error: error.message });
-  const postsWithVotes = await withPostVoteCounts(data || []);
-  res.json({ success: true, data: postsWithVotes });
+  let postsWithVotes = await withPostVoteCounts(data || []);
+
+  if (postsWithVotes.length < 20) {
+    const { data: discoveryPosts } = await supabase
+      .from('posts')
+      .select('*, author:users(username, avatar_url), community:communities(name)')
+      .order('created_at', { ascending: false })
+      .limit(120);
+
+    const merged = [...postsWithVotes, ...(discoveryPosts || [])];
+    const dedup = new Map();
+    merged.forEach((post) => {
+      if (post?.id && !dedup.has(post.id)) dedup.set(post.id, post);
+    });
+    postsWithVotes = await withPostVoteCounts([...dedup.values()]);
+  }
+
+  const now = Date.now();
+  const ranked = postsWithVotes
+    .map((post) => {
+      const ageHours = Math.max((now - new Date(post.created_at).getTime()) / (1000 * 60 * 60), 1);
+      const recencyScore = 40 / Math.sqrt(ageHours);
+      const voteScore = (post.votes_count || 0) * 2;
+      const followedAuthorBoost = followingSet.has(post.author_id) ? 20 : 0;
+      const joinedCommunityBoost = communityIds.includes(post.community_id) ? 12 : 0;
+      return {
+        ...post,
+        _rank_score: recencyScore + voteScore + followedAuthorBoost + joinedCommunityBoost
+      };
+    })
+    .sort((a, b) => b._rank_score - a._rank_score)
+    .map(({ _rank_score, ...post }) => post)
+    .slice(0, 120);
+
+  res.json({ success: true, data: ranked });
 });
 
 app.get('/api/posts/trending', async (req, res) => {
@@ -676,11 +833,13 @@ app.post('/api/bookmark', authenticate, async (req, res) => {
     // Remove bookmark
     const { error } = await userClient.from('bookmarks').delete().eq('id', existing.id);
     if (error) return res.status(500).json({ success: false, error: error.message });
+    invalidateCache(['profile:']);
     return res.json({ success: true, bookmarked: false, post_id });
   } else {
     // Add bookmark
     const { error } = await userClient.from('bookmarks').insert([{ user_id: req.user.id, post_id }]);
     if (error) return res.status(500).json({ success: false, error: error.message });
+    invalidateCache(['profile:']);
     return res.json({ success: true, bookmarked: true, post_id });
   }
 });
@@ -772,6 +931,936 @@ app.post('/api/vote', authenticate, async (req, res) => {
 
   invalidateCache(['post:', 'posts:', 'comments:post:', 'profile:', 'search:']);
   res.json({ success: true, data, totalVotes });
+});
+
+/* --- CONNECT (FOLLOWERS) --- */
+app.post('/api/connect/follow', authenticate, async (req, res) => {
+  const { target_user_id } = req.body;
+  if (!target_user_id) {
+    return res.status(400).json({ success: false, error: 'target_user_id is required' });
+  }
+
+  if (target_user_id === req.user.id) {
+    return res.status(400).json({ success: false, error: 'You cannot follow yourself' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const { blockedByMe, blockedMe, error: blockError } = await getBlockedMap(req.user.id);
+  if (blockError && blockError.code !== 'PGRST205') {
+    return res.status(500).json({ success: false, error: blockError.message });
+  }
+
+  if (blockedByMe?.has(target_user_id) || blockedMe?.has(target_user_id)) {
+    return res.status(403).json({ success: false, error: 'Cannot follow while one side is blocked' });
+  }
+
+  const { data: existing, error: existingError } = await userClient
+    .from('follows')
+    .select('id')
+    .eq('follower_id', req.user.id)
+    .eq('following_id', target_user_id)
+    .maybeSingle();
+
+  if (existingError) return res.status(500).json({ success: false, error: existingError.message });
+
+  const { data: existingRequest, error: requestLookupError } = await userClient
+    .from('follow_requests')
+    .select('id, status')
+    .eq('requester_id', req.user.id)
+    .eq('target_id', target_user_id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (requestLookupError && requestLookupError.code !== 'PGRST205') {
+    return res.status(500).json({ success: false, error: requestLookupError.message });
+  }
+
+  if (existing) {
+    const { error } = await userClient
+      .from('follows')
+      .delete()
+      .eq('id', existing.id);
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+
+    invalidateCache(['profile:', 'connect:', 'notifications:']);
+    return res.json({ success: true, following: false, target_user_id });
+  }
+
+  const { data: targetUser, error: targetError } = await supabase
+    .from('users')
+    .select('id, is_private')
+    .eq('id', target_user_id)
+    .single();
+
+  if (targetError) return res.status(404).json({ success: false, error: 'Target user not found' });
+
+  const isPrivate = asBoolean(targetUser.is_private, false);
+  if (isPrivate) {
+    if (existingRequest && existingRequest.status === 'pending') {
+      return res.json({ success: true, following: false, requested: true, target_user_id });
+    }
+
+    if (existingRequest && existingRequest.status === 'accepted') {
+      return res.json({ success: true, following: true, requested: false, target_user_id });
+    }
+
+    const { error: requestError } = await userClient
+      .from('follow_requests')
+      .insert([{ requester_id: req.user.id, target_id: target_user_id, status: 'pending' }]);
+
+    if (requestError) return res.status(500).json({ success: false, error: requestError.message });
+
+    await createNotification({
+      userClient,
+      recipientId: target_user_id,
+      actorId: req.user.id,
+      type: 'follow_request',
+      payload: {}
+    });
+
+    invalidateCache(['profile:', 'connect:', 'notifications:']);
+    return res.json({ success: true, following: false, requested: true, target_user_id });
+  }
+
+  const { error } = await userClient
+    .from('follows')
+    .insert([{ follower_id: req.user.id, following_id: target_user_id }]);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  await createNotification({
+    userClient,
+    recipientId: target_user_id,
+    actorId: req.user.id,
+    type: 'follow',
+    payload: {}
+  });
+
+  invalidateCache(['profile:', 'connect:', 'notifications:']);
+  return res.json({ success: true, following: true, target_user_id });
+});
+
+app.get('/api/connect/requests', authenticate, async (req, res) => {
+  const { data, error } = await supabase
+    .from('follow_requests')
+    .select('id, requester_id, target_id, status, created_at, requester:users!follow_requests_requester_id_fkey(id, username, avatar_url)')
+    .eq('target_id', req.user.id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      return res.json({ success: true, data: [] });
+    }
+    return res.status(500).json({ success: false, error: error.message });
+  }
+  return res.json({ success: true, data: data || [] });
+});
+
+app.post('/api/connect/request/respond', authenticate, async (req, res) => {
+  const { request_id, action } = req.body;
+  if (!request_id || !['accept', 'reject'].includes(action)) {
+    return res.status(400).json({ success: false, error: 'request_id and action(accept|reject) are required' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const { data: requestRow, error: requestError } = await userClient
+    .from('follow_requests')
+    .select('id, requester_id, target_id, status')
+    .eq('id', request_id)
+    .eq('target_id', req.user.id)
+    .single();
+
+  if (requestError) return res.status(500).json({ success: false, error: requestError.message });
+  if (requestRow.status !== 'pending') {
+    return res.status(400).json({ success: false, error: 'Request already processed' });
+  }
+
+  const nextStatus = action === 'accept' ? 'accepted' : 'rejected';
+  const { error: updateError } = await userClient
+    .from('follow_requests')
+    .update({ status: nextStatus, responded_at: new Date().toISOString() })
+    .eq('id', request_id);
+
+  if (updateError) return res.status(500).json({ success: false, error: updateError.message });
+
+  if (action === 'accept') {
+    const { error: followError } = await userClient
+      .from('follows')
+      .insert([{ follower_id: requestRow.requester_id, following_id: req.user.id }]);
+    if (followError) return res.status(500).json({ success: false, error: followError.message });
+  }
+
+  await createNotification({
+    userClient,
+    recipientId: requestRow.requester_id,
+    actorId: req.user.id,
+    type: action === 'accept' ? 'follow_request_accepted' : 'follow_request_rejected',
+    payload: {}
+  });
+
+  invalidateCache(['profile:', 'connect:', 'notifications:']);
+  return res.json({ success: true, status: nextStatus });
+});
+
+app.post('/api/connect/privacy', authenticate, async (req, res) => {
+  const { is_private } = req.body;
+  const userClient = getAuthClient(req.headers.authorization);
+
+  const { data, error } = await userClient
+    .from('users')
+    .update({ is_private: asBoolean(is_private, false) })
+    .eq('id', req.user.id)
+    .select('id, username, avatar_url, email, is_private')
+    .single();
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  invalidateCache(['profile:', 'connect:']);
+  return res.json({ success: true, data });
+});
+
+app.get('/api/connect/suggestions', authenticate, async (req, res) => {
+  const cacheKey = `connect:suggestions:${req.user.id}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
+  const { data: followedRows, error: followedError } = await supabase
+    .from('follows')
+    .select('following_id')
+    .eq('follower_id', req.user.id);
+
+  if (followedError && followedError.code !== 'PGRST205') return res.status(500).json({ success: false, error: followedError.message });
+
+  const { blockedByMe, blockedMe, error: blockError } = await getBlockedMap(req.user.id);
+  if (blockError && blockError.code !== 'PGRST205' && !isMissingTableError(blockError)) {
+    return res.status(500).json({ success: false, error: blockError.message });
+  }
+
+  const { data: myCommunities, error: myCommunitiesError } = await supabase
+    .from('community_members')
+    .select('community_id')
+    .eq('user_id', req.user.id);
+
+  if (myCommunitiesError) return res.status(500).json({ success: false, error: myCommunitiesError.message });
+
+  const myCommunityIds = new Set((myCommunities || []).map((row) => row.community_id));
+  const followedIds = new Set((followedRows || []).map((row) => row.following_id));
+
+  const { data: users, error } = await supabase
+    .from('users')
+    .select('id, username, avatar_url, created_at, is_private')
+    .order('created_at', { ascending: false })
+    .limit(80);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  const candidateUsers = (users || []).filter((item) => {
+    if (!item || !item.id || item.id === req.user.id) return false;
+    if (blockedByMe?.has(item.id) || blockedMe?.has(item.id)) return false;
+    return true;
+  });
+
+  const candidateIds = candidateUsers.map((item) => item.id);
+
+  const [{ data: followerRows, error: followerCountError }, { data: mutualRows, error: mutualError }, { data: candidateCommunities, error: candidateCommunitiesError }] = await Promise.all([
+    candidateIds.length > 0
+      ? supabase.from('follows').select('following_id').in('following_id', candidateIds)
+      : { data: [], error: null },
+    followedIds.size > 0 && candidateIds.length > 0
+      ? supabase.from('follows').select('follower_id, following_id').in('follower_id', [...followedIds]).in('following_id', candidateIds)
+      : { data: [], error: null },
+    candidateIds.length > 0
+      ? supabase.from('community_members').select('user_id, community_id').in('user_id', candidateIds)
+      : { data: [], error: null }
+  ]);
+
+  if (followerCountError) return res.status(500).json({ success: false, error: followerCountError.message });
+  if (mutualError) return res.status(500).json({ success: false, error: mutualError.message });
+  if (candidateCommunitiesError) return res.status(500).json({ success: false, error: candidateCommunitiesError.message });
+
+  const followerCounts = (followerRows || []).reduce((acc, row) => {
+    acc[row.following_id] = (acc[row.following_id] || 0) + 1;
+    return acc;
+  }, {});
+
+  const mutualCounts = (mutualRows || []).reduce((acc, row) => {
+    acc[row.following_id] = (acc[row.following_id] || 0) + 1;
+    return acc;
+  }, {});
+
+  const overlapCounts = (candidateCommunities || []).reduce((acc, row) => {
+    if (myCommunityIds.has(row.community_id)) {
+      acc[row.user_id] = (acc[row.user_id] || 0) + 1;
+    }
+    return acc;
+  }, {});
+
+  const ranked = rankSuggestedPeople({
+    users: candidateUsers,
+    followerCounts,
+    mutualCounts,
+    joinedCommunityOverlap: overlapCounts
+  }).slice(0, 30);
+
+  let suggestions = ranked.map((user) => ({
+    ...user,
+    already_following: followedIds.has(user.id)
+  }));
+
+  if (suggestions.length === 0) {
+    // Fallback list so Connect does not look empty when ranking signals are sparse.
+    suggestions = candidateUsers
+      .sort((a, b) => String(a.username || '').localeCompare(String(b.username || '')))
+      .slice(0, 30)
+      .map((user) => ({
+        ...user,
+        follower_count: Number(followerCounts[user.id] || 0),
+        mutual_count: Number(mutualCounts[user.id] || 0),
+        overlap_count: Number(overlapCounts[user.id] || 0),
+        already_following: followedIds.has(user.id)
+      }));
+  }
+
+  const payload = { success: true, data: suggestions };
+  setCache(cacheKey, payload, 30 * 1000);
+  return res.json(payload);
+});
+
+app.get('/api/connect/followers/:username', async (req, res) => {
+  const username = String(req.params.username || '').trim();
+  const cacheKey = `connect:followers:${username.toLowerCase()}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
+  const { data: targetUser, error: userError } = await supabase
+    .from('users')
+    .select('id, username')
+    .ilike('username', username)
+    .single();
+
+  if (userError) return res.status(404).json({ success: false, error: 'User not found' });
+
+  const { data: followers, error } = await supabase
+    .from('follows')
+    .select('follower:users!follows_follower_id_fkey(id, username, avatar_url)')
+    .eq('following_id', targetUser.id)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  const payload = {
+    success: true,
+    data: {
+      user: targetUser,
+      followers: (followers || []).map((row) => row.follower).filter(Boolean)
+    }
+  };
+
+  setCache(cacheKey, payload, 30 * 1000);
+  return res.json(payload);
+});
+
+app.get('/api/connect/following/:username', async (req, res) => {
+  const username = String(req.params.username || '').trim();
+  const cacheKey = `connect:following:${username.toLowerCase()}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
+  const { data: targetUser, error: userError } = await supabase
+    .from('users')
+    .select('id, username')
+    .ilike('username', username)
+    .single();
+
+  if (userError) return res.status(404).json({ success: false, error: 'User not found' });
+
+  const { data: following, error } = await supabase
+    .from('follows')
+    .select('following:users!follows_following_id_fkey(id, username, avatar_url)')
+    .eq('follower_id', targetUser.id)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  const payload = {
+    success: true,
+    data: {
+      user: targetUser,
+      following: (following || []).map((row) => row.following).filter(Boolean)
+    }
+  };
+
+  setCache(cacheKey, payload, 30 * 1000);
+  return res.json(payload);
+});
+
+app.get('/api/connect/status/:targetUserId', authenticate, async (req, res) => {
+  const targetUserId = String(req.params.targetUserId || '').trim();
+  if (!targetUserId) {
+    return res.status(400).json({ success: false, error: 'targetUserId is required' });
+  }
+
+  const [{ data: followRow, error }, { data: outgoingRequest, error: outgoingError }, { data: incomingRequest, error: incomingError }, { data: targetUser, error: targetError }] = await Promise.all([
+    supabase
+    .from('follows')
+    .select('id')
+    .eq('follower_id', req.user.id)
+    .eq('following_id', targetUserId)
+    .maybeSingle(),
+    supabase
+      .from('follow_requests')
+      .select('id, status')
+      .eq('requester_id', req.user.id)
+      .eq('target_id', targetUserId)
+      .eq('status', 'pending')
+      .maybeSingle(),
+    supabase
+      .from('follow_requests')
+      .select('id, status')
+      .eq('requester_id', targetUserId)
+      .eq('target_id', req.user.id)
+      .eq('status', 'pending')
+      .maybeSingle(),
+    supabase
+      .from('users')
+      .select('is_private')
+      .eq('id', targetUserId)
+      .maybeSingle()
+  ]);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  if (outgoingError && outgoingError.code !== 'PGRST205') return res.status(500).json({ success: false, error: outgoingError.message });
+  if (incomingError && incomingError.code !== 'PGRST205') return res.status(500).json({ success: false, error: incomingError.message });
+  if (targetError && targetError.code !== 'PGRST116') return res.status(500).json({ success: false, error: targetError.message });
+
+  return res.json({
+    success: true,
+    data: {
+      following: !!followRow,
+      requested_by_me: !!outgoingRequest,
+      requested_me: !!incomingRequest,
+      is_private: asBoolean(targetUser?.is_private, false)
+    }
+  });
+});
+
+/* --- DIRECT CHAT --- */
+app.post('/api/chat/start', authenticate, async (req, res) => {
+  const { other_user_id } = req.body;
+  if (!other_user_id) {
+    return res.status(400).json({ success: false, error: 'other_user_id is required' });
+  }
+
+  if (other_user_id === req.user.id) {
+    return res.status(400).json({ success: false, error: 'Cannot start a chat with yourself' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const { blockedByMe, blockedMe, error: blockError } = await getBlockedMap(req.user.id);
+  if (blockError && blockError.code !== 'PGRST205') {
+    return res.status(500).json({ success: false, error: blockError.message });
+  }
+  if (blockedByMe?.has(other_user_id) || blockedMe?.has(other_user_id)) {
+    return res.status(403).json({ success: false, error: 'Cannot chat while one side is blocked' });
+  }
+
+  const [{ data: mine, error: mineError }, { data: theirs, error: theirsError }] = await Promise.all([
+    supabase.from('conversation_participants').select('conversation_id').eq('user_id', req.user.id),
+    supabase.from('conversation_participants').select('conversation_id').eq('user_id', other_user_id)
+  ]);
+
+  if (mineError) return res.status(500).json({ success: false, error: mineError.message });
+  if (theirsError) return res.status(500).json({ success: false, error: theirsError.message });
+
+  const mySet = new Set((mine || []).map((row) => row.conversation_id));
+  const shared = (theirs || []).map((row) => row.conversation_id).find((id) => mySet.has(id));
+
+  if (shared) {
+    const { data: existingConv } = await supabase
+      .from('conversations')
+      .select('id, type, created_at, updated_at')
+      .eq('id', shared)
+      .eq('type', 'direct')
+      .maybeSingle();
+
+    if (existingConv) {
+      return res.json({ success: true, data: existingConv });
+    }
+  }
+
+  const { data: conversation, error: conversationError } = await userClient
+    .from('conversations')
+    .insert([{ type: 'direct' }])
+    .select()
+    .single();
+
+  if (conversationError) return res.status(500).json({ success: false, error: conversationError.message });
+
+  const { error: participantsError } = await userClient
+    .from('conversation_participants')
+    .insert([
+      { conversation_id: conversation.id, user_id: req.user.id },
+      { conversation_id: conversation.id, user_id: other_user_id }
+    ]);
+
+  if (participantsError) return res.status(500).json({ success: false, error: participantsError.message });
+
+  invalidateCache(['chat:list:', 'notifications:']);
+  return res.json({ success: true, data: conversation });
+});
+
+app.get('/api/chat/conversations', authenticate, async (req, res) => {
+  const cacheKey = `chat:list:${req.user.id}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
+  const { data: memberships, error: membershipsError } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id')
+    .eq('user_id', req.user.id);
+
+  if (membershipsError) return res.status(500).json({ success: false, error: membershipsError.message });
+
+  const conversationIds = (memberships || []).map((row) => row.conversation_id);
+  if (conversationIds.length === 0) {
+    return res.json({ success: true, data: [] });
+  }
+
+  const [{ data: conversations, error: conversationsError }, { data: participants, error: participantsError }, { data: messages, error: messagesError }] = await Promise.all([
+    supabase.from('conversations').select('id, type, created_at, updated_at').in('id', conversationIds).order('updated_at', { ascending: false }),
+    supabase.from('conversation_participants').select('conversation_id, user:users(id, username, avatar_url)').in('conversation_id', conversationIds),
+    supabase.from('messages').select('id, conversation_id, sender_id, content, created_at').in('conversation_id', conversationIds).order('created_at', { ascending: false })
+  ]);
+
+  if (conversationsError) return res.status(500).json({ success: false, error: conversationsError.message });
+  if (participantsError) return res.status(500).json({ success: false, error: participantsError.message });
+  if (messagesError) return res.status(500).json({ success: false, error: messagesError.message });
+
+  const participantMap = new Map();
+  (participants || []).forEach((row) => {
+    const list = participantMap.get(row.conversation_id) || [];
+    if (row.user) list.push(row.user);
+    participantMap.set(row.conversation_id, list);
+  });
+
+  const latestMessageMap = new Map();
+  (messages || []).forEach((msg) => {
+    if (!latestMessageMap.has(msg.conversation_id)) {
+      latestMessageMap.set(msg.conversation_id, msg);
+    }
+  });
+
+  const hydrated = (conversations || []).map((conversation) => {
+    const people = (participantMap.get(conversation.id) || []).filter((p) => p.id !== req.user.id);
+    return {
+      ...conversation,
+      peers: people,
+      last_message: latestMessageMap.get(conversation.id) || null
+    };
+  });
+
+  const payload = { success: true, data: hydrated };
+  setCache(cacheKey, payload, 5 * 1000);
+  return res.json(payload);
+});
+
+app.get('/api/chat/:conversationId/messages', authenticate, async (req, res) => {
+  const conversationId = Number(req.params.conversationId);
+  if (!Number.isFinite(conversationId)) {
+    return res.status(400).json({ success: false, error: 'Invalid conversation id' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  if (!membership.ok && membership.unauthorized) {
+    return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
+  }
+  if (!membership.ok) {
+    return res.status(500).json({ success: false, error: membership.error.message });
+  }
+
+  const limit = Math.min(Math.max(Number(req.query.limit || 40), 1), 100);
+  const before = req.query.before ? new Date(String(req.query.before)).toISOString() : null;
+
+  let query = supabase
+    .from('messages')
+    .select('id, conversation_id, sender_id, content, created_at, sender:users(username, avatar_url)')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (before) {
+    query = query.lt('created_at', before);
+  }
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  const messageIds = (data || []).map((row) => row.id);
+  let receipts = [];
+  if (messageIds.length > 0) {
+    const { data: receiptRows, error: receiptError } = await supabase
+      .from('message_receipts')
+      .select('message_id, user_id, read_at')
+      .in('message_id', messageIds)
+      .not('read_at', 'is', null);
+    if (receiptError && receiptError.code !== 'PGRST205') {
+      return res.status(500).json({ success: false, error: receiptError.message });
+    }
+    receipts = receiptRows || [];
+  }
+
+  const receiptMap = receipts.reduce((acc, row) => {
+    const list = acc.get(row.message_id) || [];
+    list.push(row);
+    acc.set(row.message_id, list);
+    return acc;
+  }, new Map());
+
+  const hydrated = (data || []).map((msg) => {
+    const rows = receiptMap.get(msg.id) || [];
+    return {
+      ...msg,
+      read_by_count: rows.length,
+      is_read_by_me: rows.some((row) => row.user_id === req.user.id)
+    };
+  });
+
+  return res.json({ success: true, data: hydrated.reverse() });
+});
+
+app.post('/api/chat/:conversationId/message', authenticate, async (req, res) => {
+  const conversationId = Number(req.params.conversationId);
+  const { content } = req.body;
+
+  if (!Number.isFinite(conversationId)) {
+    return res.status(400).json({ success: false, error: 'Invalid conversation id' });
+  }
+
+  if (!content || !String(content).trim()) {
+    return res.status(400).json({ success: false, error: 'Message content is required' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  if (!membership.ok && membership.unauthorized) {
+    return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
+  }
+  if (!membership.ok) {
+    return res.status(500).json({ success: false, error: membership.error.message });
+  }
+
+  const { data: message, error: messageError } = await userClient
+    .from('messages')
+    .insert([{ conversation_id: conversationId, sender_id: req.user.id, content: String(content).trim() }])
+    .select('id, conversation_id, sender_id, content, created_at')
+    .single();
+
+  if (messageError) return res.status(500).json({ success: false, error: messageError.message });
+
+  await userClient
+    .from('conversations')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', conversationId);
+
+  await userClient
+    .from('message_receipts')
+    .insert([{ message_id: message.id, user_id: req.user.id, read_at: new Date().toISOString() }]);
+
+  const { data: participants } = await supabase
+    .from('conversation_participants')
+    .select('user_id')
+    .eq('conversation_id', conversationId);
+
+  await Promise.all(
+    (participants || [])
+      .map((row) => row.user_id)
+      .filter((id) => id && id !== req.user.id)
+      .map((recipientId) => createNotification({
+        userClient,
+        recipientId,
+        actorId: req.user.id,
+        type: 'message',
+        payload: { conversation_id: conversationId, preview: String(content).trim().slice(0, 120) }
+      }))
+  );
+
+  invalidateCache(['chat:list:', 'notifications:']);
+  return res.json({ success: true, data: message });
+});
+
+app.post('/api/chat/:conversationId/read', authenticate, async (req, res) => {
+  const conversationId = Number(req.params.conversationId);
+  if (!Number.isFinite(conversationId)) {
+    return res.status(400).json({ success: false, error: 'Invalid conversation id' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  if (!membership.ok && membership.unauthorized) {
+    return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
+  }
+  if (!membership.ok) {
+    return res.status(500).json({ success: false, error: membership.error.message });
+  }
+
+  const { data: messages, error } = await supabase
+    .from('messages')
+    .select('id')
+    .eq('conversation_id', conversationId)
+    .neq('sender_id', req.user.id)
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  const rows = (messages || []).map((message) => ({
+    message_id: message.id,
+    user_id: req.user.id,
+    read_at: new Date().toISOString()
+  }));
+
+  if (rows.length > 0) {
+    const { error: upsertError } = await userClient
+      .from('message_receipts')
+      .upsert(rows, { onConflict: 'message_id,user_id' });
+    if (upsertError) return res.status(500).json({ success: false, error: upsertError.message });
+  }
+
+  invalidateCache(['chat:list:']);
+  return res.json({ success: true });
+});
+
+app.post('/api/chat/:conversationId/typing', authenticate, async (req, res) => {
+  const conversationId = Number(req.params.conversationId);
+  if (!Number.isFinite(conversationId)) {
+    return res.status(400).json({ success: false, error: 'Invalid conversation id' });
+  }
+
+  const { is_typing } = req.body;
+  const userClient = getAuthClient(req.headers.authorization);
+  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  if (!membership.ok && membership.unauthorized) {
+    return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
+  }
+  if (!membership.ok) {
+    return res.status(500).json({ success: false, error: membership.error.message });
+  }
+
+  const expiresAt = new Date(Date.now() + 10000).toISOString();
+  const { error } = await userClient
+    .from('chat_typing')
+    .upsert([{
+      conversation_id: conversationId,
+      user_id: req.user.id,
+      is_typing: asBoolean(is_typing, false),
+      updated_at: new Date().toISOString(),
+      expires_at: expiresAt
+    }], { onConflict: 'conversation_id,user_id' });
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  return res.json({ success: true });
+});
+
+app.get('/api/chat/:conversationId/typing', authenticate, async (req, res) => {
+  const conversationId = Number(req.params.conversationId);
+  if (!Number.isFinite(conversationId)) {
+    return res.status(400).json({ success: false, error: 'Invalid conversation id' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  if (!membership.ok && membership.unauthorized) {
+    return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
+  }
+  if (!membership.ok) {
+    return res.status(500).json({ success: false, error: membership.error.message });
+  }
+
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('chat_typing')
+    .select('user_id, is_typing, expires_at, user:users(id, username, avatar_url)')
+    .eq('conversation_id', conversationId)
+    .eq('is_typing', true)
+    .gt('expires_at', now)
+    .neq('user_id', req.user.id);
+
+  if (error && error.code !== 'PGRST205') return res.status(500).json({ success: false, error: error.message });
+  return res.json({ success: true, data: data || [] });
+});
+
+/* --- MODERATION --- */
+app.post('/api/moderation/block', authenticate, async (req, res) => {
+  const { target_user_id } = req.body;
+  if (!target_user_id || target_user_id === req.user.id) {
+    return res.status(400).json({ success: false, error: 'Valid target_user_id is required' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const { data: existing, error: existingError } = await userClient
+    .from('user_blocks')
+    .select('id')
+    .eq('blocker_id', req.user.id)
+    .eq('blocked_id', target_user_id)
+    .maybeSingle();
+
+  if (existingError && existingError.code !== 'PGRST205') {
+    return res.status(500).json({ success: false, error: existingError.message });
+  }
+
+  if (existing) {
+    const { error } = await userClient
+      .from('user_blocks')
+      .delete()
+      .eq('id', existing.id);
+    if (error) return res.status(500).json({ success: false, error: error.message });
+
+    invalidateCache(['connect:', 'chat:list:', 'profile:']);
+    return res.json({ success: true, blocked: false, target_user_id });
+  }
+
+  const { error } = await userClient
+    .from('user_blocks')
+    .insert([{ blocker_id: req.user.id, blocked_id: target_user_id }]);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  // Remove social/chat relation when blocked.
+  await userClient
+    .from('follows')
+    .delete()
+    .or(`and(follower_id.eq.${req.user.id},following_id.eq.${target_user_id}),and(follower_id.eq.${target_user_id},following_id.eq.${req.user.id})`);
+
+  invalidateCache(['connect:', 'chat:list:', 'profile:']);
+  return res.json({ success: true, blocked: true, target_user_id });
+});
+
+app.get('/api/moderation/blocks', authenticate, async (req, res) => {
+  const { data, error } = await supabase
+    .from('user_blocks')
+    .select('id, blocked_id, created_at, blocked:users!user_blocks_blocked_id_fkey(id, username, avatar_url)')
+    .eq('blocker_id', req.user.id)
+    .order('created_at', { ascending: false });
+
+  if (error && error.code !== 'PGRST205' && !isMissingTableError(error)) return res.status(500).json({ success: false, error: error.message });
+  return res.json({ success: true, data: data || [] });
+});
+
+app.post('/api/moderation/report', authenticate, async (req, res) => {
+  const { target_user_id = null, post_id = null, comment_id = null, conversation_id = null, reason = '', details = '' } = req.body;
+  if (!reason || !String(reason).trim()) {
+    return res.status(400).json({ success: false, error: 'reason is required' });
+  }
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const { data, error } = await userClient
+    .from('reports')
+    .insert([{
+      reporter_id: req.user.id,
+      target_user_id,
+      post_id,
+      comment_id,
+      conversation_id,
+      reason: String(reason).trim(),
+      details: String(details || '').trim()
+    }])
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  return res.json({ success: true, data });
+});
+
+/* --- NOTIFICATION PREFERENCES --- */
+app.get('/api/notifications/preferences', authenticate, async (req, res) => {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select('user_id, follows_enabled, follow_requests_enabled, messages_enabled, comments_enabled, mentions_enabled')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST205') return res.status(500).json({ success: false, error: error.message });
+
+  const fallback = {
+    user_id: req.user.id,
+    follows_enabled: true,
+    follow_requests_enabled: true,
+    messages_enabled: true,
+    comments_enabled: true,
+    mentions_enabled: true
+  };
+
+  return res.json({ success: true, data: data || fallback });
+});
+
+app.post('/api/notifications/preferences', authenticate, async (req, res) => {
+  const body = req.body || {};
+  const nextPrefs = {
+    user_id: req.user.id,
+    follows_enabled: asBoolean(body.follows_enabled, true),
+    follow_requests_enabled: asBoolean(body.follow_requests_enabled, true),
+    messages_enabled: asBoolean(body.messages_enabled, true),
+    comments_enabled: asBoolean(body.comments_enabled, true),
+    mentions_enabled: asBoolean(body.mentions_enabled, true)
+  };
+
+  const userClient = getAuthClient(req.headers.authorization);
+  const { data, error } = await userClient
+    .from('notification_preferences')
+    .upsert([nextPrefs], { onConflict: 'user_id' })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  invalidateCache(['notifications:']);
+  return res.json({ success: true, data });
+});
+
+/* --- NOTIFICATIONS --- */
+app.get('/api/notifications', authenticate, async (req, res) => {
+  const cacheKey = `notifications:${req.user.id}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, recipient_id, actor_id, type, payload, read_at, created_at, actor:users!notifications_actor_id_fkey(id, username, avatar_url)')
+    .eq('recipient_id', req.user.id)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  const payload = { success: true, data: data || [] };
+  setCache(cacheKey, payload, 5 * 1000);
+  return res.json(payload);
+});
+
+app.post('/api/notifications/read', authenticate, async (req, res) => {
+  const { ids } = req.body;
+  const userClient = getAuthClient(req.headers.authorization);
+  const now = new Date().toISOString();
+
+  let query = userClient
+    .from('notifications')
+    .update({ read_at: now })
+    .eq('recipient_id', req.user.id)
+    .is('read_at', null);
+
+  if (Array.isArray(ids) && ids.length > 0) {
+    query = query.in('id', ids);
+  }
+
+  const { error } = await query;
+  if (error) return res.status(500).json({ success: false, error: error.message });
+
+  invalidateCache(['notifications:']);
+  return res.json({ success: true });
 });
 
 /* --- SEARCH --- */

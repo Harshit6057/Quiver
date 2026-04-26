@@ -1,15 +1,24 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { fetchProfile, updateUserAvatar, uploadPostMedia } from '../api';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { createReport, fetchFollowStatus, fetchFollowers, fetchFollowing, fetchProfile, startChat, toggleBlockUser, toggleFollow, updateUserAvatar, uploadPostMedia } from '../api';
 import PostMediaRenderer from '../components/PostMediaRenderer';
 
 const UserProfile = ({ user, onUserUpdated }) => {
+  const navigate = useNavigate();
   const { username } = useParams();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [removingPhoto, setRemovingPhoto] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isRequested, setIsRequested] = useState(false);
+  const [followActionLoading, setFollowActionLoading] = useState(false);
+  const [messageActionLoading, setMessageActionLoading] = useState(false);
+  const [blockActionLoading, setBlockActionLoading] = useState(false);
+  const [reportActionLoading, setReportActionLoading] = useState(false);
   const avatarInputRef = useRef(null);
   const connectedClustersRef = useRef(null);
 
@@ -33,6 +42,43 @@ const UserProfile = ({ user, onUserUpdated }) => {
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    const run = async () => {
+      if (!username) return;
+
+      const [followersRes, followingRes] = await Promise.all([
+        fetchFollowers(username),
+        fetchFollowing(username)
+      ]);
+
+      if (followersRes?.success) {
+        setFollowersCount((followersRes.data?.followers || []).length);
+      }
+      if (followingRes?.success) {
+        setFollowingCount((followingRes.data?.following || []).length);
+      }
+    };
+
+    run();
+  }, [username]);
+
+  useEffect(() => {
+    const run = async () => {
+      if (!user || !profile || user.id === profile.id) {
+        setIsFollowing(false);
+        return;
+      }
+
+      const res = await fetchFollowStatus(profile.id);
+      if (res?.success) {
+        setIsFollowing(!!res.data?.following);
+        setIsRequested(!!res.data?.requested_by_me);
+      }
+    };
+
+    run();
+  }, [user, profile]);
 
   const handleSynchronize = async () => {
     setSyncing(true);
@@ -107,6 +153,69 @@ const UserProfile = ({ user, onUserUpdated }) => {
     connectedClustersRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const handleFollowToggle = async () => {
+    if (!user || !profile || user.id === profile.id) return;
+
+    setFollowActionLoading(true);
+    const previous = isFollowing;
+    const previousRequested = isRequested;
+    setIsFollowing(!previous);
+    setIsRequested(false);
+    setFollowersCount((prev) => prev + (previous ? -1 : 1));
+
+    const res = await toggleFollow(profile.id);
+    if (!res?.success) {
+      setIsFollowing(previous);
+      setIsRequested(previousRequested);
+      setFollowersCount((prev) => prev + (previous ? 1 : -1));
+      alert(res?.error || 'Unable to update follow status right now');
+    } else {
+      setIsFollowing(!!res.following);
+      setIsRequested(!!res.requested);
+      if (res.requested) {
+        setFollowersCount((prev) => Math.max(prev - 1, 0));
+      }
+    }
+    setFollowActionLoading(false);
+  };
+
+  const handleMessageUser = async () => {
+    if (!user || !profile || user.id === profile.id) return;
+
+    setMessageActionLoading(true);
+    const res = await startChat(profile.id);
+    if (res?.success) {
+      navigate(`/messages?conversation=${res.data.id}`);
+    } else {
+      alert(res?.error || 'Unable to open chat right now');
+    }
+    setMessageActionLoading(false);
+  };
+
+  const handleBlockToggle = async () => {
+    if (!user || !profile || user.id === profile.id) return;
+    setBlockActionLoading(true);
+    const res = await toggleBlockUser(profile.id);
+    if (!res?.success) {
+      alert(res?.error || 'Unable to change block status right now');
+    } else {
+      alert(res.blocked ? 'User blocked' : 'User unblocked');
+    }
+    setBlockActionLoading(false);
+  };
+
+  const handleReport = async () => {
+    if (!user || !profile || user.id === profile.id) return;
+    setReportActionLoading(true);
+    const res = await createReport({ target_user_id: profile.id, reason: 'user_report', details: 'Reported from profile page' });
+    if (!res?.success) {
+      alert(res?.error || 'Unable to submit report');
+    } else {
+      alert('Report submitted');
+    }
+    setReportActionLoading(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -176,10 +285,54 @@ const UserProfile = ({ user, onUserUpdated }) => {
                 <span className="text-2xl sm:text-3xl lg:text-[2rem] font-bold font-headline text-secondary">{profile.clusterCount}</span>
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Connected Clusters</span>
               </button>
+              <div className="flex flex-col">
+                <span className="text-2xl sm:text-3xl lg:text-[2rem] font-bold font-headline text-white">{followersCount}</span>
+                <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Followers</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-2xl sm:text-3xl lg:text-[2rem] font-bold font-headline text-white">{followingCount}</span>
+                <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Following</span>
+              </div>
             </div>
           </div>
         </div>
         <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col justify-center lg:justify-end gap-3 z-10 relative pb-0 sm:pb-2">
+          {user?.id !== profile.id && (
+            <>
+              <button
+                type="button"
+                onClick={handleFollowToggle}
+                disabled={followActionLoading}
+                className="w-full sm:w-auto px-4 sm:px-6 py-3 bg-gradient-to-r from-secondary to-primary text-on-primary rounded-xl font-black uppercase tracking-widest text-[10px] sm:text-xs shadow-[0_0_20px_rgba(221,183,255,0.3)] hover:shadow-[0_0_40px_rgba(221,183,255,0.5)] transition-all active:scale-95 disabled:opacity-60"
+              >
+                {followActionLoading ? 'Updating...' : (isRequested ? 'Requested' : (isFollowing ? 'Following' : 'Follow'))}
+              </button>
+              <button
+                type="button"
+                onClick={handleMessageUser}
+                disabled={messageActionLoading}
+                className="w-full sm:w-auto px-4 sm:px-6 py-3 glass-panel rounded-xl text-white hover:bg-white/10 transition-all border border-white/10"
+              >
+                {messageActionLoading ? 'Opening...' : 'Message'}
+              </button>
+              <button
+                type="button"
+                onClick={handleBlockToggle}
+                disabled={blockActionLoading}
+                className="w-full sm:w-auto px-4 sm:px-6 py-3 glass-panel rounded-xl text-white hover:bg-white/10 transition-all border border-white/10"
+              >
+                {blockActionLoading ? 'Updating...' : 'Block'}
+              </button>
+              <button
+                type="button"
+                onClick={handleReport}
+                disabled={reportActionLoading}
+                className="w-full sm:w-auto px-4 sm:px-6 py-3 glass-panel rounded-xl text-white hover:bg-white/10 transition-all border border-white/10"
+              >
+                {reportActionLoading ? 'Sending...' : 'Report'}
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={handleSynchronize}

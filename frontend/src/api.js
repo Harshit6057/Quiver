@@ -221,3 +221,161 @@ export const searchEverything = async (query) => {
     return apiRequest(`search?q=${encodeURIComponent(query || '')}`);
 };
 
+// -- CONNECT --
+export const toggleFollow = async (target_user_id) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('connect/follow', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ target_user_id })
+    });
+};
+
+export const fetchFollowSuggestions = async () => {
+    const headers = await getAuthHeaders();
+    return apiRequest('connect/suggestions', { headers });
+};
+
+export const fetchFollowers = async (username) => {
+    return apiRequest(`connect/followers/${encodeURIComponent(username)}`);
+};
+
+export const fetchFollowing = async (username) => {
+    return apiRequest(`connect/following/${encodeURIComponent(username)}`);
+};
+
+export const fetchFollowStatus = async (targetUserId) => {
+    const headers = await getAuthHeaders();
+    return apiRequest(`connect/status/${encodeURIComponent(targetUserId)}`, { headers });
+};
+
+export const fetchFollowRequests = async () => {
+    const headers = await getAuthHeaders();
+    return apiRequest('connect/requests', { headers });
+};
+
+export const respondFollowRequest = async (request_id, action) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('connect/request/respond', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ request_id, action })
+    });
+};
+
+export const updatePrivacy = async (is_private) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('connect/privacy', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ is_private })
+    });
+};
+
+// -- CHAT --
+export const startChat = async (other_user_id) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('chat/start', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ other_user_id })
+    });
+};
+
+export const fetchConversations = async () => {
+    const headers = await getAuthHeaders();
+    return apiRequest('chat/conversations', { headers });
+};
+
+export const fetchMessages = async (conversationId, limit = 40, before = null) => {
+    const headers = await getAuthHeaders();
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (before) params.set('before', before);
+    return apiRequest(`chat/${conversationId}/messages?${params.toString()}`, { headers });
+};
+
+export const sendMessage = async (conversationId, content) => {
+    const headers = await getAuthHeaders();
+    return apiRequest(`chat/${conversationId}/message`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ content })
+    });
+};
+
+export const markConversationRead = async (conversationId) => {
+    const headers = await getAuthHeaders();
+    return apiRequest(`chat/${conversationId}/read`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({})
+    });
+};
+
+export const setTypingStatus = async (conversationId, is_typing) => {
+    const headers = await getAuthHeaders();
+    return apiRequest(`chat/${conversationId}/typing`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ is_typing })
+    });
+};
+
+export const fetchTypingStatus = async (conversationId) => {
+    const headers = await getAuthHeaders();
+    return apiRequest(`chat/${conversationId}/typing`, { headers });
+};
+
+// -- MODERATION --
+export const toggleBlockUser = async (target_user_id) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('moderation/block', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ target_user_id })
+    });
+};
+
+export const fetchBlockedUsers = async () => {
+    const headers = await getAuthHeaders();
+    return apiRequest('moderation/blocks', { headers });
+};
+
+export const createReport = async (payload) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('moderation/report', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+    });
+};
+
+// -- NOTIFICATIONS --
+export const fetchNotifications = async () => {
+    const headers = await getAuthHeaders();
+    return apiRequest('notifications', { headers });
+};
+
+export const markNotificationsRead = async (ids = []) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('notifications/read', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ids })
+    });
+};
+
+export const fetchNotificationPreferences = async () => {
+    const headers = await getAuthHeaders();
+    return apiRequest('notifications/preferences', { headers });
+};
+
+export const updateNotificationPreferences = async (prefs) => {
+    const headers = await getAuthHeaders();
+    return apiRequest('notifications/preferences', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(prefs)
+    });
+};
+
