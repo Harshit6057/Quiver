@@ -82,6 +82,20 @@ ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversation_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
+CREATE OR REPLACE FUNCTION public.is_conversation_participant(cid bigint, uid uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.conversation_participants cp
+    WHERE cp.conversation_id = cid
+      AND cp.user_id = uid
+  );
+$$;
+
 DROP POLICY IF EXISTS "Participants can read conversations" ON public.conversations;
 DROP POLICY IF EXISTS "Participants can create conversations" ON public.conversations;
 DROP POLICY IF EXISTS "Participants can update conversations" ON public.conversations;
@@ -93,65 +107,43 @@ DROP POLICY IF EXISTS "Participants can send messages" ON public.messages;
 CREATE POLICY "Participants can read conversations"
 ON public.conversations FOR SELECT
 USING (
-  EXISTS (
-    SELECT 1
-    FROM public.conversation_participants cp
-    WHERE cp.conversation_id = conversations.id
-      AND cp.user_id = auth.uid()
-  )
+  public.is_conversation_participant(conversations.id, auth.uid())
 );
 
 CREATE POLICY "Participants can create conversations"
 ON public.conversations FOR INSERT
-WITH CHECK (auth.role() = 'authenticated');
+WITH CHECK (auth.uid() IS NOT NULL);
 
 CREATE POLICY "Participants can update conversations"
 ON public.conversations FOR UPDATE
 USING (
-  EXISTS (
-    SELECT 1
-    FROM public.conversation_participants cp
-    WHERE cp.conversation_id = conversations.id
-      AND cp.user_id = auth.uid()
-  )
+  public.is_conversation_participant(conversations.id, auth.uid())
 );
 
 CREATE POLICY "Participants can read participants"
 ON public.conversation_participants FOR SELECT
 USING (
-  EXISTS (
-    SELECT 1
-    FROM public.conversation_participants cp
-    WHERE cp.conversation_id = conversation_participants.conversation_id
-      AND cp.user_id = auth.uid()
-  )
+  public.is_conversation_participant(conversation_participants.conversation_id, auth.uid())
 );
 
 CREATE POLICY "Users can insert self participant rows"
 ON public.conversation_participants FOR INSERT
-WITH CHECK (auth.uid() = user_id);
+WITH CHECK (
+  auth.uid() = user_id
+  OR public.is_conversation_participant(conversation_participants.conversation_id, auth.uid())
+);
 
 CREATE POLICY "Participants can read messages"
 ON public.messages FOR SELECT
 USING (
-  EXISTS (
-    SELECT 1
-    FROM public.conversation_participants cp
-    WHERE cp.conversation_id = messages.conversation_id
-      AND cp.user_id = auth.uid()
-  )
+  public.is_conversation_participant(messages.conversation_id, auth.uid())
 );
 
 CREATE POLICY "Participants can send messages"
 ON public.messages FOR INSERT
 WITH CHECK (
   auth.uid() = sender_id
-  AND EXISTS (
-    SELECT 1
-    FROM public.conversation_participants cp
-    WHERE cp.conversation_id = messages.conversation_id
-      AND cp.user_id = auth.uid()
-  )
+  AND public.is_conversation_participant(messages.conversation_id, auth.uid())
 );
 
 -- 5) Notifications + preferences

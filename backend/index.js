@@ -1539,14 +1539,17 @@ app.post('/api/chat/start', authenticate, async (req, res) => {
 
   if (conversationError) return res.status(500).json({ success: false, error: conversationError.message });
 
-  const { error: participantsError } = await userClient
+  const { error: selfParticipantError } = await userClient
     .from('conversation_participants')
-    .insert([
-      { conversation_id: conversation.id, user_id: req.user.id },
-      { conversation_id: conversation.id, user_id: other_user_id }
-    ]);
+    .insert([{ conversation_id: conversation.id, user_id: req.user.id }]);
 
-  if (participantsError) return res.status(500).json({ success: false, error: participantsError.message });
+  if (selfParticipantError) return res.status(500).json({ success: false, error: selfParticipantError.message });
+
+  const { error: otherParticipantError } = await userClient
+    .from('conversation_participants')
+    .insert([{ conversation_id: conversation.id, user_id: other_user_id }]);
+
+  if (otherParticipantError) return res.status(500).json({ success: false, error: otherParticipantError.message });
 
   invalidateCache(['chat:list:', 'notifications:']);
   return res.json({ success: true, data: conversation });
