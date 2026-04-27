@@ -204,6 +204,7 @@ $$;
 
 DROP POLICY IF EXISTS "Participants can read conversations" ON public.conversations;
 DROP POLICY IF EXISTS "Participants can create conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Authenticated users can create conversations" ON public.conversations;
 DROP POLICY IF EXISTS "Participants can update conversations" ON public.conversations;
 DROP POLICY IF EXISTS "Participants can read participants" ON public.conversation_participants;
 DROP POLICY IF EXISTS "Users can insert self participant rows" ON public.conversation_participants;
@@ -218,7 +219,8 @@ USING (
 
 CREATE POLICY "Participants can create conversations"
 ON public.conversations FOR INSERT
-WITH CHECK (auth.uid() IS NOT NULL);
+TO authenticated
+WITH CHECK (true);
 
 CREATE POLICY "Participants can update conversations"
 ON public.conversations FOR UPDATE
