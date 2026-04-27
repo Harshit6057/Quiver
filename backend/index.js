@@ -124,7 +124,13 @@ const isMissingTableError = (error) => {
   const code = String(error.code || '').toLowerCase();
   const message = String(error.message || '').toLowerCase();
   const details = String(error.details || '').toLowerCase();
-  return code === '42p01' || message.includes('does not exist') || details.includes('does not exist');
+  return (
+    code === '42p01' ||
+    code === '42703' ||
+    message.includes('does not exist') ||
+    details.includes('does not exist') ||
+    message.includes('could not find a relationship')
+  );
 };
 
 const rankSuggestedPeople = ({ users = [], followerCounts = {}, mutualCounts = {}, joinedCommunityOverlap = {} }) => {
@@ -1043,9 +1049,9 @@ app.post('/api/connect/follow', authenticate, async (req, res) => {
 });
 
 app.get('/api/connect/requests', authenticate, async (req, res) => {
-  const { data, error } = await supabase
+  const { data: requestRows, error } = await supabase
     .from('follow_requests')
-    .select('id, requester_id, target_id, status, created_at, requester:users!follow_requests_requester_id_fkey(id, username, avatar_url)')
+    .select('id, requester_id, target_id, status, created_at')
     .eq('target_id', req.user.id)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
@@ -1056,7 +1062,23 @@ app.get('/api/connect/requests', authenticate, async (req, res) => {
     }
     return res.status(500).json({ success: false, error: error.message });
   }
-  return res.json({ success: true, data: data || [] });
+
+  const requesterIds = [...new Set((requestRows || []).map((row) => row.requester_id).filter(Boolean))];
+  let requesterMap = new Map();
+  if (requesterIds.length > 0) {
+    const { data: usersData } = await supabase
+      .from('users')
+      .select('id, username, avatar_url')
+      .in('id', requesterIds);
+    requesterMap = new Map((usersData || []).map((item) => [item.id, item]));
+  }
+
+  const hydrated = (requestRows || []).map((row) => ({
+    ...row,
+    requester: requesterMap.get(row.requester_id) || null
+  }));
+
+  return res.json({ success: true, data: hydrated });
 });
 
 app.post('/api/connect/request/respond', authenticate, async (req, res) => {
@@ -1132,7 +1154,9 @@ app.get('/api/connect/suggestions', authenticate, async (req, res) => {
     .select('following_id')
     .eq('follower_id', req.user.id);
 
-  if (followedError && followedError.code !== 'PGRST205') return res.status(500).json({ success: false, error: followedError.message });
+  if (followedError && followedError.code !== 'PGRST205' && !isMissingTableError(followedError)) {
+    return res.status(500).json({ success: false, error: followedError.message });
+  }
 
   const { blockedByMe, blockedMe, error: blockError } = await getBlockedMap(req.user.id);
   if (blockError && blockError.code !== 'PGRST205' && !isMissingTableError(blockError)) {
@@ -1149,13 +1173,30 @@ app.get('/api/connect/suggestions', authenticate, async (req, res) => {
   const myCommunityIds = new Set((myCommunities || []).map((row) => row.community_id));
   const followedIds = new Set((followedRows || []).map((row) => row.following_id));
 
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('id, username, avatar_url, created_at, is_private')
-    .order('created_at', { ascending: false })
-    .limit(80);
+  let users = [];
+  {
+    const withPrivacy = await supabase
+      .from('users')
+      .select('id, username, avatar_url, created_at, is_private')
+      .order('created_at', { ascending: false })
+      .limit(80);
 
-  if (error) return res.status(500).json({ success: false, error: error.message });
+    if (!withPrivacy.error) {
+      users = withPrivacy.data || [];
+    } else if (isMissingTableError(withPrivacy.error)) {
+      const fallback = await supabase
+        .from('users')
+        .select('id, username, avatar_url, created_at')
+        .order('created_at', { ascending: false })
+        .limit(80);
+      if (fallback.error) {
+        return res.status(500).json({ success: false, error: fallback.error.message });
+      }
+      users = (fallback.data || []).map((row) => ({ ...row, is_private: false }));
+    } else {
+      return res.status(500).json({ success: false, error: withPrivacy.error.message });
+    }
+  }
 
   const candidateUsers = (users || []).filter((item) => {
     if (!item || !item.id || item.id === req.user.id) return false;
@@ -1177,8 +1218,8 @@ app.get('/api/connect/suggestions', authenticate, async (req, res) => {
       : { data: [], error: null }
   ]);
 
-  if (followerCountError) return res.status(500).json({ success: false, error: followerCountError.message });
-  if (mutualError) return res.status(500).json({ success: false, error: mutualError.message });
+  if (followerCountError && !isMissingTableError(followerCountError)) return res.status(500).json({ success: false, error: followerCountError.message });
+  if (mutualError && !isMissingTableError(mutualError)) return res.status(500).json({ success: false, error: mutualError.message });
   if (candidateCommunitiesError) return res.status(500).json({ success: false, error: candidateCommunitiesError.message });
 
   const followerCounts = (followerRows || []).reduce((acc, row) => {
