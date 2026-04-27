@@ -202,6 +202,20 @@ AS $$
   );
 $$;
 
+DO $$
+DECLARE
+  p record;
+BEGIN
+  FOR p IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN ('conversations', 'conversation_participants', 'messages')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', p.policyname, p.schemaname, p.tablename);
+  END LOOP;
+END $$;
+
 DROP POLICY IF EXISTS "Participants can read conversations" ON public.conversations;
 DROP POLICY IF EXISTS "Participants can create conversations" ON public.conversations;
 DROP POLICY IF EXISTS "Authenticated users can create conversations" ON public.conversations;
@@ -210,7 +224,6 @@ DROP POLICY IF EXISTS "Participants can read participants" ON public.conversatio
 DROP POLICY IF EXISTS "Users can insert self participant rows" ON public.conversation_participants;
 DROP POLICY IF EXISTS "Participants can read messages" ON public.messages;
 DROP POLICY IF EXISTS "Participants can send messages" ON public.messages;
-
 CREATE POLICY "Participants can read conversations"
 ON public.conversations FOR SELECT
 USING (
