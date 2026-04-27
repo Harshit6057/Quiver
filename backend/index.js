@@ -967,7 +967,19 @@ app.post('/api/connect/follow', authenticate, async (req, res) => {
     .eq('following_id', target_user_id)
     .maybeSingle();
 
-  if (existingError) return res.status(500).json({ success: false, error: existingError.message });
+  if (existingError) {
+    if (isMissingTableError(existingError)) {
+      return res.json({
+        success: true,
+        following: false,
+        requested: false,
+        target_user_id,
+        feature_unavailable: true,
+        message: 'Follow table is not available in database yet'
+      });
+    }
+    return res.status(500).json({ success: false, error: existingError.message });
+  }
 
   const { data: existingRequest, error: requestLookupError } = await userClient
     .from('follow_requests')
@@ -978,7 +990,7 @@ app.post('/api/connect/follow', authenticate, async (req, res) => {
     .limit(1)
     .maybeSingle();
 
-  if (requestLookupError && requestLookupError.code !== 'PGRST205') {
+  if (requestLookupError && requestLookupError.code !== 'PGRST205' && !isMissingTableError(requestLookupError)) {
     return res.status(500).json({ success: false, error: requestLookupError.message });
   }
 
@@ -994,13 +1006,30 @@ app.post('/api/connect/follow', authenticate, async (req, res) => {
     return res.json({ success: true, following: false, target_user_id });
   }
 
-  const { data: targetUser, error: targetError } = await supabase
+  const { data: targetUserData, error: targetError } = await supabase
     .from('users')
     .select('id, is_private')
     .eq('id', target_user_id)
     .single();
 
-  if (targetError) return res.status(404).json({ success: false, error: 'Target user not found' });
+  let targetUser = targetUserData;
+
+  if (targetError) {
+    if (isMissingTableError(targetError)) {
+      const { data: fallbackTarget, error: fallbackError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', target_user_id)
+        .single();
+      if (fallbackError || !fallbackTarget) {
+        return res.status(404).json({ success: false, error: 'Target user not found' });
+      }
+      // If privacy column is missing, treat target as public.
+      targetUser = { ...fallbackTarget, is_private: false };
+    } else {
+      return res.status(404).json({ success: false, error: 'Target user not found' });
+    }
+  }
 
   const isPrivate = asBoolean(targetUser.is_private, false);
   if (isPrivate) {
@@ -1016,7 +1045,19 @@ app.post('/api/connect/follow', authenticate, async (req, res) => {
       .from('follow_requests')
       .insert([{ requester_id: req.user.id, target_id: target_user_id, status: 'pending' }]);
 
-    if (requestError) return res.status(500).json({ success: false, error: requestError.message });
+    if (requestError) {
+      if (isMissingTableError(requestError)) {
+        return res.json({
+          success: true,
+          following: false,
+          requested: false,
+          target_user_id,
+          feature_unavailable: true,
+          message: 'Follow requests are not available in database yet'
+        });
+      }
+      return res.status(500).json({ success: false, error: requestError.message });
+    }
 
     await createNotification({
       userClient,
@@ -1034,7 +1075,19 @@ app.post('/api/connect/follow', authenticate, async (req, res) => {
     .from('follows')
     .insert([{ follower_id: req.user.id, following_id: target_user_id }]);
 
-  if (error) return res.status(500).json({ success: false, error: error.message });
+  if (error) {
+    if (isMissingTableError(error)) {
+      return res.json({
+        success: true,
+        following: false,
+        requested: false,
+        target_user_id,
+        feature_unavailable: true,
+        message: 'Follow table is not available in database yet'
+      });
+    }
+    return res.status(500).json({ success: false, error: error.message });
+  }
 
   await createNotification({
     userClient,
@@ -1138,7 +1191,25 @@ app.post('/api/connect/privacy', authenticate, async (req, res) => {
     .select('id, username, avatar_url, email, is_private')
     .single();
 
-  if (error) return res.status(500).json({ success: false, error: error.message });
+  if (error) {
+    if (isMissingTableError(error)) {
+      const { data: fallbackUser, error: fallbackError } = await userClient
+        .from('users')
+        .select('id, username, avatar_url, email')
+        .eq('id', req.user.id)
+        .single();
+
+      if (fallbackError) return res.status(500).json({ success: false, error: fallbackError.message });
+
+      return res.json({
+        success: true,
+        data: { ...fallbackUser, is_private: false },
+        feature_unavailable: true,
+        message: 'Privacy column is not available in database yet'
+      });
+    }
+    return res.status(500).json({ success: false, error: error.message });
+  }
 
   invalidateCache(['profile:', 'connect:']);
   return res.json({ success: true, data });
@@ -1290,7 +1361,21 @@ app.get('/api/connect/followers/:username', async (req, res) => {
     .eq('following_id', targetUser.id)
     .order('created_at', { ascending: false });
 
-  if (error) return res.status(500).json({ success: false, error: error.message });
+  if (error) {
+    if (isMissingTableError(error)) {
+      const payload = {
+        success: true,
+        data: {
+          user: targetUser,
+          followers: []
+        },
+        feature_unavailable: true
+      };
+      setCache(cacheKey, payload, 30 * 1000);
+      return res.json(payload);
+    }
+    return res.status(500).json({ success: false, error: error.message });
+  }
 
   const payload = {
     success: true,
@@ -1324,7 +1409,21 @@ app.get('/api/connect/following/:username', async (req, res) => {
     .eq('follower_id', targetUser.id)
     .order('created_at', { ascending: false });
 
-  if (error) return res.status(500).json({ success: false, error: error.message });
+  if (error) {
+    if (isMissingTableError(error)) {
+      const payload = {
+        success: true,
+        data: {
+          user: targetUser,
+          following: []
+        },
+        feature_unavailable: true
+      };
+      setCache(cacheKey, payload, 30 * 1000);
+      return res.json(payload);
+    }
+    return res.status(500).json({ success: false, error: error.message });
+  }
 
   const payload = {
     success: true,
@@ -1372,10 +1471,10 @@ app.get('/api/connect/status/:targetUserId', authenticate, async (req, res) => {
       .maybeSingle()
   ]);
 
-  if (error) return res.status(500).json({ success: false, error: error.message });
-  if (outgoingError && outgoingError.code !== 'PGRST205') return res.status(500).json({ success: false, error: outgoingError.message });
-  if (incomingError && incomingError.code !== 'PGRST205') return res.status(500).json({ success: false, error: incomingError.message });
-  if (targetError && targetError.code !== 'PGRST116') return res.status(500).json({ success: false, error: targetError.message });
+  if (error && !isMissingTableError(error)) return res.status(500).json({ success: false, error: error.message });
+  if (outgoingError && outgoingError.code !== 'PGRST205' && !isMissingTableError(outgoingError)) return res.status(500).json({ success: false, error: outgoingError.message });
+  if (incomingError && incomingError.code !== 'PGRST205' && !isMissingTableError(incomingError)) return res.status(500).json({ success: false, error: incomingError.message });
+  if (targetError && targetError.code !== 'PGRST116' && !isMissingTableError(targetError)) return res.status(500).json({ success: false, error: targetError.message });
 
   return res.json({
     success: true,
