@@ -126,8 +126,8 @@ USING (
 
 CREATE POLICY "Participants can create conversations"
 ON public.conversations FOR INSERT
-TO authenticated
-WITH CHECK (true);
+TO public
+WITH CHECK (auth.uid() IS NOT NULL);
 
 CREATE POLICY "Participants can update conversations"
 ON public.conversations FOR UPDATE

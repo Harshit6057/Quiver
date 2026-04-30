@@ -1537,7 +1537,15 @@ app.post('/api/chat/start', authenticate, async (req, res) => {
     .select()
     .single();
 
-  if (conversationError) return res.status(500).json({ success: false, error: conversationError.message });
+  if (conversationError) {
+    return res.status(500).json({
+      success: false,
+      error: conversationError.message,
+      code: conversationError.code || null,
+      details: conversationError.details || null,
+      hint: conversationError.hint || null
+    });
+  }
 
   const { error: selfParticipantError } = await userClient
     .from('conversation_participants')
