@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import { supabase, getAuthClient } from './supabaseClient.js';
+import { supabase, getAdminClient, getAuthClient } from './supabaseClient.js';
 
 dotenv.config();
 
@@ -1508,8 +1508,8 @@ app.post('/api/chat/start', authenticate, async (req, res) => {
   }
 
   const [{ data: mine, error: mineError }, { data: theirs, error: theirsError }] = await Promise.all([
-    supabase.from('conversation_participants').select('conversation_id').eq('user_id', req.user.id),
-    supabase.from('conversation_participants').select('conversation_id').eq('user_id', other_user_id)
+    adminClient.from('conversation_participants').select('conversation_id').eq('user_id', req.user.id),
+    adminClient.from('conversation_participants').select('conversation_id').eq('user_id', other_user_id)
   ]);
 
   if (mineError) return res.status(500).json({ success: false, error: mineError.message });
@@ -1519,7 +1519,7 @@ app.post('/api/chat/start', authenticate, async (req, res) => {
   const shared = (theirs || []).map((row) => row.conversation_id).find((id) => mySet.has(id));
 
   if (shared) {
-    const { data: existingConv } = await supabase
+    const { data: existingConv } = await adminClient
       .from('conversations')
       .select('id, type, created_at, updated_at')
       .eq('id', shared)
@@ -1531,7 +1531,7 @@ app.post('/api/chat/start', authenticate, async (req, res) => {
     }
   }
 
-  const { data: conversation, error: conversationError } = await userClient
+  const { data: conversation, error: conversationError } = await adminClient
     .from('conversations')
     .insert([{ type: 'direct' }])
     .select()
@@ -1547,13 +1547,13 @@ app.post('/api/chat/start', authenticate, async (req, res) => {
     });
   }
 
-  const { error: selfParticipantError } = await userClient
+  const { error: selfParticipantError } = await adminClient
     .from('conversation_participants')
     .insert([{ conversation_id: conversation.id, user_id: req.user.id }]);
 
   if (selfParticipantError) return res.status(500).json({ success: false, error: selfParticipantError.message });
 
-  const { error: otherParticipantError } = await userClient
+  const { error: otherParticipantError } = await adminClient
     .from('conversation_participants')
     .insert([{ conversation_id: conversation.id, user_id: other_user_id }]);
 
@@ -1568,7 +1568,9 @@ app.get('/api/chat/conversations', authenticate, async (req, res) => {
   const cached = getCache(cacheKey);
   if (cached) return res.json(cached);
 
-  const { data: memberships, error: membershipsError } = await supabase
+  const adminClient = getAdminClient();
+
+  const { data: memberships, error: membershipsError } = await adminClient
     .from('conversation_participants')
     .select('conversation_id')
     .eq('user_id', req.user.id);
@@ -1581,9 +1583,9 @@ app.get('/api/chat/conversations', authenticate, async (req, res) => {
   }
 
   const [{ data: conversations, error: conversationsError }, { data: participants, error: participantsError }, { data: messages, error: messagesError }] = await Promise.all([
-    supabase.from('conversations').select('id, type, created_at, updated_at').in('id', conversationIds).order('updated_at', { ascending: false }),
-    supabase.from('conversation_participants').select('conversation_id, user:users(id, username, avatar_url)').in('conversation_id', conversationIds),
-    supabase.from('messages').select('id, conversation_id, sender_id, content, created_at').in('conversation_id', conversationIds).order('created_at', { ascending: false })
+    adminClient.from('conversations').select('id, type, created_at, updated_at').in('id', conversationIds).order('updated_at', { ascending: false }),
+    adminClient.from('conversation_participants').select('conversation_id, user:users(id, username, avatar_url)').in('conversation_id', conversationIds),
+    adminClient.from('messages').select('id, conversation_id, sender_id, content, created_at').in('conversation_id', conversationIds).order('created_at', { ascending: false })
   ]);
 
   if (conversationsError) return res.status(500).json({ success: false, error: conversationsError.message });
@@ -1624,8 +1626,8 @@ app.get('/api/chat/:conversationId/messages', authenticate, async (req, res) => 
     return res.status(400).json({ success: false, error: 'Invalid conversation id' });
   }
 
-  const userClient = getAuthClient(req.headers.authorization);
-  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  const adminClient = getAdminClient();
+  const membership = await ensureConversationParticipant(adminClient, conversationId, req.user.id);
   if (!membership.ok && membership.unauthorized) {
     return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
   }
@@ -1636,7 +1638,7 @@ app.get('/api/chat/:conversationId/messages', authenticate, async (req, res) => 
   const limit = Math.min(Math.max(Number(req.query.limit || 40), 1), 100);
   const before = req.query.before ? new Date(String(req.query.before)).toISOString() : null;
 
-  let query = supabase
+  let query = adminClient
     .from('messages')
     .select('id, conversation_id, sender_id, content, created_at, sender:users(username, avatar_url)')
     .eq('conversation_id', conversationId)
@@ -1653,7 +1655,7 @@ app.get('/api/chat/:conversationId/messages', authenticate, async (req, res) => 
   const messageIds = (data || []).map((row) => row.id);
   let receipts = [];
   if (messageIds.length > 0) {
-    const { data: receiptRows, error: receiptError } = await supabase
+    const { data: receiptRows, error: receiptError } = await adminClient
       .from('message_receipts')
       .select('message_id, user_id, read_at')
       .in('message_id', messageIds)
@@ -1695,8 +1697,8 @@ app.post('/api/chat/:conversationId/message', authenticate, async (req, res) => 
     return res.status(400).json({ success: false, error: 'Message content is required' });
   }
 
-  const userClient = getAuthClient(req.headers.authorization);
-  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  const adminClient = getAdminClient();
+  const membership = await ensureConversationParticipant(adminClient, conversationId, req.user.id);
   if (!membership.ok && membership.unauthorized) {
     return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
   }
@@ -1704,7 +1706,7 @@ app.post('/api/chat/:conversationId/message', authenticate, async (req, res) => 
     return res.status(500).json({ success: false, error: membership.error.message });
   }
 
-  const { data: message, error: messageError } = await userClient
+  const { data: message, error: messageError } = await adminClient
     .from('messages')
     .insert([{ conversation_id: conversationId, sender_id: req.user.id, content: String(content).trim() }])
     .select('id, conversation_id, sender_id, content, created_at')
@@ -1712,16 +1714,16 @@ app.post('/api/chat/:conversationId/message', authenticate, async (req, res) => 
 
   if (messageError) return res.status(500).json({ success: false, error: messageError.message });
 
-  await userClient
+  await adminClient
     .from('conversations')
     .update({ updated_at: new Date().toISOString() })
     .eq('id', conversationId);
 
-  await userClient
+  await adminClient
     .from('message_receipts')
     .insert([{ message_id: message.id, user_id: req.user.id, read_at: new Date().toISOString() }]);
 
-  const { data: participants } = await supabase
+  const { data: participants } = await adminClient
     .from('conversation_participants')
     .select('user_id')
     .eq('conversation_id', conversationId);
@@ -1731,7 +1733,7 @@ app.post('/api/chat/:conversationId/message', authenticate, async (req, res) => 
       .map((row) => row.user_id)
       .filter((id) => id && id !== req.user.id)
       .map((recipientId) => createNotification({
-        userClient,
+        userClient: adminClient,
         recipientId,
         actorId: req.user.id,
         type: 'message',
@@ -1749,8 +1751,8 @@ app.post('/api/chat/:conversationId/read', authenticate, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid conversation id' });
   }
 
-  const userClient = getAuthClient(req.headers.authorization);
-  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  const adminClient = getAdminClient();
+  const membership = await ensureConversationParticipant(adminClient, conversationId, req.user.id);
   if (!membership.ok && membership.unauthorized) {
     return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
   }
@@ -1758,7 +1760,7 @@ app.post('/api/chat/:conversationId/read', authenticate, async (req, res) => {
     return res.status(500).json({ success: false, error: membership.error.message });
   }
 
-  const { data: messages, error } = await supabase
+  const { data: messages, error } = await adminClient
     .from('messages')
     .select('id')
     .eq('conversation_id', conversationId)
@@ -1775,7 +1777,7 @@ app.post('/api/chat/:conversationId/read', authenticate, async (req, res) => {
   }));
 
   if (rows.length > 0) {
-    const { error: upsertError } = await userClient
+    const { error: upsertError } = await adminClient
       .from('message_receipts')
       .upsert(rows, { onConflict: 'message_id,user_id' });
     if (upsertError) return res.status(500).json({ success: false, error: upsertError.message });
@@ -1792,8 +1794,8 @@ app.post('/api/chat/:conversationId/typing', authenticate, async (req, res) => {
   }
 
   const { is_typing } = req.body;
-  const userClient = getAuthClient(req.headers.authorization);
-  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  const adminClient = getAdminClient();
+  const membership = await ensureConversationParticipant(adminClient, conversationId, req.user.id);
   if (!membership.ok && membership.unauthorized) {
     return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
   }
@@ -1802,7 +1804,7 @@ app.post('/api/chat/:conversationId/typing', authenticate, async (req, res) => {
   }
 
   const expiresAt = new Date(Date.now() + 10000).toISOString();
-  const { error } = await userClient
+  const { error } = await adminClient
     .from('chat_typing')
     .upsert([{
       conversation_id: conversationId,
@@ -1822,8 +1824,8 @@ app.get('/api/chat/:conversationId/typing', authenticate, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid conversation id' });
   }
 
-  const userClient = getAuthClient(req.headers.authorization);
-  const membership = await ensureConversationParticipant(userClient, conversationId, req.user.id);
+  const adminClient = getAdminClient();
+  const membership = await ensureConversationParticipant(adminClient, conversationId, req.user.id);
   if (!membership.ok && membership.unauthorized) {
     return res.status(403).json({ success: false, error: 'You are not a participant in this conversation' });
   }
@@ -1832,7 +1834,7 @@ app.get('/api/chat/:conversationId/typing', authenticate, async (req, res) => {
   }
 
   const now = new Date().toISOString();
-  const { data, error } = await supabase
+  const { data, error } = await adminClient
     .from('chat_typing')
     .select('user_id, is_typing, expires_at, user:users(id, username, avatar_url)')
     .eq('conversation_id', conversationId)
