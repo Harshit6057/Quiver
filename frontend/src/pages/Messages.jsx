@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchConversations, fetchMessages, fetchTypingStatus, markConversationRead, sendMessage, setTypingStatus } from '../api';
 
@@ -12,6 +12,7 @@ const Messages = ({ user }) => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [typingUsers, setTypingUsers] = useState([]);
+  const messagesLoadedRef = useRef(false);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => item.id === selectedConversationId) || null,
@@ -52,6 +53,11 @@ const Messages = ({ user }) => {
   }, [user, selectedConversationId]);
 
   useEffect(() => {
+    setMessages([]);
+    messagesLoadedRef.current = false;
+  }, [selectedConversationId]);
+
+  useEffect(() => {
     let timer;
 
     const loadMessages = async () => {
@@ -60,13 +66,20 @@ const Messages = ({ user }) => {
         return;
       }
 
-      setLoadingMessages(true);
+      if (!messagesLoadedRef.current) {
+        setLoadingMessages(true);
+      }
+
       const res = await fetchMessages(selectedConversationId, 60);
       if (res?.success) {
         setMessages(res.data || []);
         await markConversationRead(selectedConversationId);
       }
-      setLoadingMessages(false);
+
+      if (!messagesLoadedRef.current) {
+        setLoadingMessages(false);
+        messagesLoadedRef.current = true;
+      }
 
       timer = setTimeout(loadMessages, 3000);
     };
