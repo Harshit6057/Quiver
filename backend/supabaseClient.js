@@ -11,6 +11,10 @@ if (!supabaseUrl || !supabaseKey) {
   console.error("Missing Supabase credentials!");
 }
 
+if (!supabaseServiceKey) {
+  console.warn('SUPABASE_SERVICE_ROLE_KEY is not set. Chat creation/read/write routes will fall back to anon and may fail RLS.');
+}
+
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const adminSupabase = supabaseServiceKey

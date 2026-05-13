@@ -1499,6 +1499,7 @@ app.post('/api/chat/start', authenticate, async (req, res) => {
   }
 
   const userClient = getAuthClient(req.headers.authorization);
+  const adminClient = getAdminClient();
   const { blockedByMe, blockedMe, error: blockError } = await getBlockedMap(req.user.id);
   if (blockError && blockError.code !== 'PGRST205') {
     return res.status(500).json({ success: false, error: blockError.message });
