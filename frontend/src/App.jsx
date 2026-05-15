@@ -1,24 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { fetchBookmarks, fetchCurrentUser, fetchFeed, toggleBookmark } from './api';
 import { supabase } from './supabaseClient';
 import Layout from './components/Layout';
-import Home from './pages/Home';
-import PostDetail from './pages/PostDetail';
-import ExploreCommunities from './pages/ExploreCommunities';
-import CommunityView from './pages/CommunityView';
-import CreateCommunity from './pages/CreateCommunity';
-import CreatePost from './pages/CreatePost';
-import UserProfile from './pages/UserProfile';
-import LandingPage from './pages/LandingPage';
-import Login from './pages/Login';
-import Bookmarks from './pages/Bookmarks';
-import Trending from './pages/Trending';
-import History from './pages/History';
-import SearchResults from './pages/SearchResults';
-import Connect from './pages/Connect';
-import Messages from './pages/Messages';
-import Notifications from './pages/Notifications';
+
+const Home = lazy(() => import('./pages/Home'));
+const PostDetail = lazy(() => import('./pages/PostDetail'));
+const ExploreCommunities = lazy(() => import('./pages/ExploreCommunities'));
+const CommunityView = lazy(() => import('./pages/CommunityView'));
+const CreateCommunity = lazy(() => import('./pages/CreateCommunity'));
+const CreatePost = lazy(() => import('./pages/CreatePost'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const Login = lazy(() => import('./pages/Login'));
+const Bookmarks = lazy(() => import('./pages/Bookmarks'));
+const Trending = lazy(() => import('./pages/Trending'));
+const History = lazy(() => import('./pages/History'));
+const SearchResults = lazy(() => import('./pages/SearchResults'));
+const Connect = lazy(() => import('./pages/Connect'));
+const Messages = lazy(() => import('./pages/Messages'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+
+const RouteLoader = () => (
+  <div className="min-h-[50vh] flex items-center justify-center">
+    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
+  </div>
+);
 
 function App() {
   const [user, setUser] = useState(null);
@@ -170,25 +177,27 @@ function App() {
 
   return (
     <Layout user={user} handleLogin={handleLogin}>
-      <Routes>
-        <Route path="/" element={<Home feed={feed} user={user} bookmarkedPostIds={bookmarkedPostIds} onToggleBookmark={handleToggleBookmark} voteCounts={voteCounts} onVoteCountChange={handleVoteCountChange} />} />
-        <Route path="/explore" element={<ExploreCommunities user={user} />} />
-        <Route path="/c/:community" element={<CommunityView user={user} />} />
-        <Route path="/create-community" element={<CreateCommunity />} />
-        <Route path="/create-post" element={<CreatePost user={user} />} />
-        <Route path="/create-post/:community" element={<CreatePost user={user} />} />
-        <Route path="/u/:username" element={<UserProfile user={user} onUserUpdated={handleUserUpdated} />} />
-        <Route path="/post/:id" element={<PostDetail user={user} bookmarkedPostIds={bookmarkedPostIds} onToggleBookmark={handleToggleBookmark} voteCounts={voteCounts} onVoteCountChange={handleVoteCountChange} />} />
-        <Route path="/bookmarks" element={<Bookmarks user={user} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />} />
-        <Route path="/history" element={<History user={user} bookmarks={bookmarks} />} />
-        <Route path="/search" element={<SearchResults user={user} />} />
-        <Route path="/trending" element={<Trending />} />
-        <Route path="/connect" element={<Connect user={user} onUserUpdated={handleUserUpdated} />} />
-        <Route path="/messages" element={<Messages user={user} />} />
-        <Route path="/notifications" element={<Notifications user={user} />} />
-        <Route path="/landing" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
-      </Routes>
+      <Suspense fallback={<RouteLoader />}>
+        <Routes>
+          <Route path="/" element={<Home feed={feed} user={user} bookmarkedPostIds={bookmarkedPostIds} onToggleBookmark={handleToggleBookmark} voteCounts={voteCounts} onVoteCountChange={handleVoteCountChange} />} />
+          <Route path="/explore" element={<ExploreCommunities user={user} />} />
+          <Route path="/c/:community" element={<CommunityView user={user} />} />
+          <Route path="/create-community" element={<CreateCommunity />} />
+          <Route path="/create-post" element={<CreatePost user={user} />} />
+          <Route path="/create-post/:community" element={<CreatePost user={user} />} />
+          <Route path="/u/:username" element={<UserProfile user={user} onUserUpdated={handleUserUpdated} />} />
+          <Route path="/post/:id" element={<PostDetail user={user} bookmarkedPostIds={bookmarkedPostIds} onToggleBookmark={handleToggleBookmark} voteCounts={voteCounts} onVoteCountChange={handleVoteCountChange} />} />
+          <Route path="/bookmarks" element={<Bookmarks user={user} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />} />
+          <Route path="/history" element={<History user={user} bookmarks={bookmarks} />} />
+          <Route path="/search" element={<SearchResults user={user} />} />
+          <Route path="/trending" element={<Trending />} />
+          <Route path="/connect" element={<Connect user={user} onUserUpdated={handleUserUpdated} />} />
+          <Route path="/messages" element={<Messages user={user} />} />
+          <Route path="/notifications" element={<Notifications user={user} />} />
+          <Route path="/landing" element={<LandingPage />} />
+          <Route path="/login" element={<Login />} />
+        </Routes>
+      </Suspense>
     </Layout>
   );
 }
