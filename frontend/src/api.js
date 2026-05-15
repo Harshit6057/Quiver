@@ -9,6 +9,48 @@ const API_URL = RAW_API_URL
 
 const apiPath = (path) => `${API_URL}/${String(path).replace(/^\/+/, '')}`;
 
+const apiCache = new Map();
+
+const readCache = (key) => {
+    const entry = apiCache.get(key);
+    if (!entry) return null;
+    if (Date.now() >= entry.expiresAt) {
+        apiCache.delete(key);
+        return null;
+    }
+    return entry.value;
+};
+
+const writeCache = (key, value, ttlMs) => {
+    apiCache.set(key, {
+        value,
+        expiresAt: Date.now() + ttlMs
+    });
+};
+
+const getCachedOrFetch = async (key, ttlMs, fetcher) => {
+    const cached = readCache(key);
+    if (cached) return cached;
+
+    const value = await fetcher();
+    if (value?.success) {
+        writeCache(key, value, ttlMs);
+    }
+    return value;
+};
+
+const invalidateCache = (prefixes = []) => {
+    if (!Array.isArray(prefixes) || prefixes.length === 0) return;
+    const keys = Array.from(apiCache.keys());
+    keys.forEach((key) => {
+        if (prefixes.some((prefix) => key.startsWith(prefix))) {
+            apiCache.delete(key);
+        }
+    });
+};
+
+const getAuthScope = (headers = {}) => String(headers?.Authorization || 'anon').slice(-24);
+
 if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && API_URL.includes('localhost')) {
     console.warn('VITE_API_URL is pointing to localhost in production. Configure Vercel env to your Render backend URL.');
 }
@@ -74,12 +116,15 @@ export const loginWithGoogle = async () => {
 
 export const fetchCurrentUser = async () => {
     const headers = await getAuthHeaders();
-    return apiRequest('user', { headers });
+    const scope = getAuthScope(headers);
+    return getCachedOrFetch(`user:self:${scope}`, 20 * 1000, () => apiRequest('user', { headers }));
 };
 
 export const fetchProfile = async (username) => {
     const headers = await getAuthHeaders();
-    return apiRequest(`user/profile/${encodeURIComponent(username)}`, { headers });
+    const scope = getAuthScope(headers);
+    const key = `profile:${scope}:${String(username || '').toLowerCase()}`;
+    return getCachedOrFetch(key, 30 * 1000, () => apiRequest(`user/profile/${encodeURIComponent(username)}`, { headers }));
 };
 
 // -- COMMUNITY --
@@ -94,11 +139,15 @@ export const createCommunity = async (name, description, image_url = null) => {
 
 export const updateUserAvatar = async (avatar_url = null) => {
     const headers = await getAuthHeaders();
-    return apiRequest('user/avatar', {
+    const res = await apiRequest('user/avatar', {
         method: 'POST',
         headers,
         body: JSON.stringify({ avatar_url })
     });
+    if (res?.success) {
+        invalidateCache(['user:self:', 'profile:']);
+    }
+    return res;
 };
 
 export const updateCommunityPhoto = async (community_id, image_url) => {
@@ -224,92 +273,130 @@ export const searchEverything = async (query) => {
 // -- CONNECT --
 export const toggleFollow = async (target_user_id) => {
     const headers = await getAuthHeaders();
-    return apiRequest('connect/follow', {
+    const res = await apiRequest('connect/follow', {
         method: 'POST',
         headers,
         body: JSON.stringify({ target_user_id })
     });
+    if (res?.success) {
+        invalidateCache(['connect:', 'profile:']);
+    }
+    return res;
 };
 
 export const fetchFollowSuggestions = async () => {
     const headers = await getAuthHeaders();
-    return apiRequest('connect/suggestions', { headers });
+    const scope = getAuthScope(headers);
+    return getCachedOrFetch(`connect:suggestions:${scope}`, 12 * 1000, () => apiRequest('connect/suggestions', { headers }));
 };
 
 export const fetchFollowers = async (username) => {
-    return apiRequest(`connect/followers/${encodeURIComponent(username)}`);
+    const key = `connect:followers:${String(username || '').toLowerCase()}`;
+    return getCachedOrFetch(key, 20 * 1000, () => apiRequest(`connect/followers/${encodeURIComponent(username)}`));
 };
 
 export const fetchFollowing = async (username) => {
-    return apiRequest(`connect/following/${encodeURIComponent(username)}`);
+    const key = `connect:following:${String(username || '').toLowerCase()}`;
+    return getCachedOrFetch(key, 20 * 1000, () => apiRequest(`connect/following/${encodeURIComponent(username)}`));
 };
 
 export const fetchFollowStatus = async (targetUserId) => {
     const headers = await getAuthHeaders();
-    return apiRequest(`connect/status/${encodeURIComponent(targetUserId)}`, { headers });
+    const scope = getAuthScope(headers);
+    return getCachedOrFetch(`connect:status:${scope}:${targetUserId}`, 10 * 1000, () => apiRequest(`connect/status/${encodeURIComponent(targetUserId)}`, { headers }));
 };
 
 export const fetchFollowRequests = async () => {
     const headers = await getAuthHeaders();
-    return apiRequest('connect/requests', { headers });
+    const scope = getAuthScope(headers);
+    return getCachedOrFetch(`connect:requests:${scope}`, 8 * 1000, () => apiRequest('connect/requests', { headers }));
 };
 
 export const respondFollowRequest = async (request_id, action) => {
     const headers = await getAuthHeaders();
-    return apiRequest('connect/request/respond', {
+    const res = await apiRequest('connect/request/respond', {
         method: 'POST',
         headers,
         body: JSON.stringify({ request_id, action })
     });
+    if (res?.success) {
+        invalidateCache(['connect:', 'profile:']);
+    }
+    return res;
 };
 
 export const updatePrivacy = async (is_private) => {
     const headers = await getAuthHeaders();
-    return apiRequest('connect/privacy', {
+    const res = await apiRequest('connect/privacy', {
         method: 'POST',
         headers,
         body: JSON.stringify({ is_private })
     });
+    if (res?.success) {
+        invalidateCache(['connect:', 'profile:', 'user:self:']);
+    }
+    return res;
 };
 
 // -- CHAT --
 export const startChat = async (other_user_id) => {
     const headers = await getAuthHeaders();
-    return apiRequest('chat/start', {
+    const res = await apiRequest('chat/start', {
         method: 'POST',
         headers,
         body: JSON.stringify({ other_user_id })
     });
+    if (res?.success) {
+        invalidateCache(['chat:conversations:', 'connect:suggestions:', 'notifications:']);
+    }
+    return res;
 };
 
 export const fetchConversations = async () => {
     const headers = await getAuthHeaders();
-    return apiRequest('chat/conversations', { headers });
+    const scope = getAuthScope(headers);
+    return getCachedOrFetch(`chat:conversations:${scope}`, 4 * 1000, () => apiRequest('chat/conversations', { headers }));
 };
 
 export const fetchMessages = async (conversationId, limit = 40, before = null) => {
     const headers = await getAuthHeaders();
     const params = new URLSearchParams({ limit: String(limit) });
     if (before) params.set('before', before);
-    return apiRequest(`chat/${conversationId}/messages?${params.toString()}`, { headers });
+    const scope = getAuthScope(headers);
+    const key = `chat:messages:${scope}:${conversationId}:${limit}:${before || ''}`;
+    return getCachedOrFetch(key, 2 * 1000, () => apiRequest(`chat/${conversationId}/messages?${params.toString()}`, { headers }));
 };
 
 export const sendMessage = async (conversationId, content) => {
     const headers = await getAuthHeaders();
-    return apiRequest(`chat/${conversationId}/message`, {
+    const res = await apiRequest(`chat/${conversationId}/message`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ content })
     });
+    if (res?.success) {
+        const scope = getAuthScope(headers);
+        invalidateCache([
+            `chat:messages:${scope}:${conversationId}:`,
+            `chat:conversations:${scope}`,
+            'notifications:'
+        ]);
+    }
+    return res;
 };
 
 export const markConversationRead = async (conversationId) => {
     const headers = await getAuthHeaders();
-    return apiRequest(`chat/${conversationId}/read`, {
+    const res = await apiRequest(`chat/${conversationId}/read`, {
         method: 'POST',
         headers,
         body: JSON.stringify({})
     });
+    if (res?.success) {
+        const scope = getAuthScope(headers);
+        invalidateCache([`chat:messages:${scope}:${conversationId}:`, `notifications:${scope}`]);
+    }
+    return res;
 };
 
 export const setTypingStatus = async (conversationId, is_typing) => {
@@ -353,29 +440,41 @@ export const createReport = async (payload) => {
 // -- NOTIFICATIONS --
 export const fetchNotifications = async () => {
     const headers = await getAuthHeaders();
-    return apiRequest('notifications', { headers });
+    const scope = getAuthScope(headers);
+    return getCachedOrFetch(`notifications:list:${scope}`, 6 * 1000, () => apiRequest('notifications', { headers }));
 };
 
 export const markNotificationsRead = async (ids = []) => {
     const headers = await getAuthHeaders();
-    return apiRequest('notifications/read', {
+    const res = await apiRequest('notifications/read', {
         method: 'POST',
         headers,
         body: JSON.stringify({ ids })
     });
+    if (res?.success) {
+        const scope = getAuthScope(headers);
+        invalidateCache([`notifications:list:${scope}`]);
+    }
+    return res;
 };
 
 export const fetchNotificationPreferences = async () => {
     const headers = await getAuthHeaders();
-    return apiRequest('notifications/preferences', { headers });
+    const scope = getAuthScope(headers);
+    return getCachedOrFetch(`notifications:prefs:${scope}`, 30 * 1000, () => apiRequest('notifications/preferences', { headers }));
 };
 
 export const updateNotificationPreferences = async (prefs) => {
     const headers = await getAuthHeaders();
-    return apiRequest('notifications/preferences', {
+    const res = await apiRequest('notifications/preferences', {
         method: 'POST',
         headers,
         body: JSON.stringify(prefs)
     });
+    if (res?.success) {
+        const scope = getAuthScope(headers);
+        invalidateCache([`notifications:prefs:${scope}`]);
+    }
+    return res;
 };
 
